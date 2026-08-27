@@ -32,7 +32,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 import config
-from categorizer import TransactionCategorizer
+from categorizer import TransactionCategorizer, HybridTransactionCategorizer
 from evaluate import backtest_forecaster, evaluate_overspend_detector
 from features import (
     PROFILE_FEATURE_COLS,
@@ -89,7 +89,11 @@ def run(source: str = "combined", users: int = config.SYNTH_N_USERS, months: int
     desc, labels = cdf["description"].values, cdf["category"].values
     Xtr, Xte, ytr, yte = train_test_split(desc, labels, test_size=0.2,
                                           random_state=seed, stratify=labels)
-    cat = TransactionCategorizer().fit(Xtr, ytr)
+    # Choose categorizer based on flag
+    if real_categorizer:
+        cat = HybridTransactionCategorizer().fit(Xtr, ytr)
+    else:
+        cat = TransactionCategorizer().fit(Xtr, ytr)
     cat_metrics = cat.evaluate(Xte, yte)
     metrics["categorizer"] = {k: cat_metrics[k] for k in
                               ("accuracy", "macro_f1", "weighted_f1", "n_test")}
@@ -207,10 +211,11 @@ def main() -> None:
     ap.add_argument("--goal-rate", type=float, default=0.25,
                     help="demo savings-goal as a fraction of income")
     ap.add_argument("--seed", type=int, default=config.RANDOM_SEED)
+    ap.add_argument("--real-categorizer", action="store_true", help="Use hybrid transformer-based categorizer instead of baseline TF-IDF.")
     args = ap.parse_args()
     src = "synthetic" if args.synthetic else ("real" if args.cc_only else "combined")
     run(source=src, users=args.users, months=args.months, sample_users=args.sample_users,
-        demo_goal_rate=args.goal_rate, seed=args.seed)
+        demo_goal_rate=args.goal_rate, seed=args.seed, real_categorizer=args.real_categorizer)
 
 
 if __name__ == "__main__":

@@ -11,3 +11,5 @@ kagglehub>=0.2
 
 # Optional — HuggingFace real datasets (gated set; needs `huggingface-cli login`).
 # datasets>=2.16      # HuggingFace: mitulshah/transaction-categorization (4.5M rows)
+sentence-transformers>=2.2
+torch>=2.0

@@ -52,11 +52,12 @@ the batch models supply the learned parameters, the online layer applies them in
 
 Trains on **combined real data by default** (`data_sources.load_all_real_transactions()`):
 
-- **Kaggle `credit-card-transactions-dataset`** — ~1.3M real transactions, 983 users, 18 months:
-  the rich per‑category expense backbone.
-- **Kaggle `personal-finance-tracker-dataset`** — 944 users: adds real monthly **income**,
-  **housing**, **financial** (loan/investment) and **utilities**, so the panel covers income + every
-  expense category (subscriptions stay label‑only — no real per‑user amounts exist publicly).
+- **Kaggle `credit-card-transactions-dataset`** — ~1.3M real transactions, 983 users, 18 months: the rich per‑category expense backbone.
+- **Kaggle `personal-finance-tracker-dataset`** — 944 users: adds real monthly **income**, **housing**, **financial** (loan/investment) and **utilities**, so the panel covers income + every expense category (subscriptions stay label‑only — no real per‑user amounts exist publicly).
+- **Kaggle `indian-financial-transactions`** — ~500k transactions from Indian users, includes UPI merchant names and localized categories. *(https://www.kaggle.com/datasets/rajkumarrr/indian-financial-transactions)*
+- **HuggingFace `indian_finance/upi_transactions`** — curated UPI transaction dataset with over 200k entries, useful for Indian merchant lexicon. *(https://huggingface.co/datasets/indian_finance/upi_transactions)*
+- **Zindi `india-credit-card-transactions`** — competition dataset focusing on Indian credit‑card spending patterns. *(https://zindi.africa/competitions/india-credit-card-transactions)*
+- **Gov.in `pmjdy-transaction-data`** — government‑released PM Jan Dhan Yojana transaction data for financial inclusion research. *(https://data.gov.in/dataset/pmjdy-transaction-data)*
 
 Flags: `--cc-only` (credit‑card only) or `--synthetic` (offline, zero‑credential fallback via
 `src/synth.py`). Forecast accuracy is reported with **WAPE** (robust to $0‑spend months; plain MAPE
