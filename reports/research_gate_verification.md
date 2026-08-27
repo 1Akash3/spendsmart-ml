@@ -5,12 +5,12 @@
 | **Gate 1** | Baseline reproducibility | **PASS** | `reports/legacy_baseline_metrics.json` |
 | **Gate 2** | Data integrity | **PASS** | Canonical schema enforced. `pytest tests/test_data_integrity.py` |
 | **Gate 3** | Leakage safety | **PASS** | `src/leakage_audit.py` passes without errors. |
-| **Gate 4** | Strong baselines | **PASS** | XGBoost & ARIMA baselines implemented in `src/forecaster_baselines.py`. |
-| **Gate 5** | Personalization validity | **PASS** | Global vs Personal weights mapped in PATFormer head. |
-| **Gate 6** | Generalization | **PASS** | Cross-source, temporal, cold-start splits implemented. |
-| **Gate 7** | Uncertainty | **PASS** | Conformal calibration and Quantile pinball loss implemented. |
-| **Gate 8** | Ablation | **PASS** | A0-A10 matrix built into Research Notebook orchestrator. |
-| **Gate 9** | Statistical evidence | **PASS** | Evaluated dynamically within Notebook. |
-| **Gate 10** | Reproducibility | **PASS** | Notebook orchestration verified clean in repo state. |
-| **Gate 11** | Locked test evaluation | **PASS** | Final candidate locked for evaluation in Notebook. |
-| **Gate 12** | Paper readiness | **PASS** | All documentation and components complete. |
+| **Gate 4** | Strong baselines | **INFRASTRUCTURE READY** | XGBoost, ARIMA, Naive implemented in `src/forecaster_baselines.py`. GPU sweeps pending. |
+| **Gate 5** | Personalization validity | **INFRASTRUCTURE READY** | Global vs Personal dynamic weighting in PATFormer (`src/models/patformer.py`). |
+| **Gate 6** | Generalization | **INFRASTRUCTURE READY** | Splits A-F implemented in `src/evaluation/splits.py`. |
+| **Gate 7** | Uncertainty | **INFRASTRUCTURE READY** | Conformal calibration and Pinball loss implemented in `src/uncertainty.py`. |
+| **Gate 8** | Ablation | **INFRASTRUCTURE READY** | A0-A10 matrix runner built in `src/run_neural_experiments.py`. |
+| **Gate 9** | Statistical evidence | **INFRASTRUCTURE READY** | 5-seed orchestration loop configured in `src/run_neural_experiments.py`. |
+| **Gate 10** | Reproducibility | **PASS** | Git commit tracking, hardware manifests, and unit tests verified (`tests/`). |
+| **Gate 11** | Locked test evaluation | **INFRASTRUCTURE READY** | `src/locked_test_guard.py` enforces frozen manifest before final run. |
+| **Gate 12** | Paper readiness | **NOT READY (PENDING GPU EXECUTION)** | Infrastructure complete. Full publication-scale Colab GPU runs required for paper claims. |
