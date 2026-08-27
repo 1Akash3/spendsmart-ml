@@ -47,3 +47,24 @@ def test_financial_health():
     score = scorer.score_user(df)
     assert "overall_score" in score
     assert 0 <= score["overall_score"] <= 100
+
+def test_synthetic_data_schema_and_temporal_split():
+    from src.synth import generate_transactions
+    from src.evaluation.splits import create_temporal_split
+    
+    df = generate_transactions(n_users=10, months=6, seed=42)
+    
+    # 1. Verify required transaction fields
+    required_cols = ["timestamp", "user_id", "amount", "direction", "merchant_raw", "category", "date", "type"]
+    for col in required_cols:
+        assert col in df.columns, f"Missing required column: {col}"
+        
+    # 2. Verify timestamp datatype and validity
+    assert pd.api.types.is_datetime64_any_dtype(df["timestamp"])
+    assert not df["timestamp"].isnull().any()
+    
+    # 3. Verify temporal split execution on synthetic dataset
+    train, test = create_temporal_split(df, train_fraction=0.8)
+    assert len(train) > 0 and len(test) > 0
+    assert train["timestamp"].max() <= test["timestamp"].min()
+

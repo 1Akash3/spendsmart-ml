@@ -138,6 +138,38 @@ def _seasonal_multiplier(category: str, month_idx_in_year: int) -> float:
     return 1.0
 
 
+def _make_timestamp(rng: np.random.Generator, base_date: pd.Timestamp) -> pd.Timestamp:
+    h = int(rng.integers(8, 22))
+    m = int(rng.integers(0, 60))
+    s = int(rng.integers(0, 60))
+    return base_date + pd.Timedelta(hours=h, minutes=m, seconds=s)
+
+
+def _make_row(uid: int, ts: pd.Timestamp, amt: float, merch: str, desc: str, cat: str,
+              tp: str, is_recurring: bool, persona: str, income: float, row_idx: int) -> dict:
+    direction = "credit" if tp == "income" else "debit"
+    merch_key = str(merch).lower().strip().replace(" ", "_")
+    return dict(
+        user_id=uid,
+        timestamp=ts,
+        date=ts,
+        amount=round(float(amt), 2),
+        direction=direction,
+        merchant=merch,
+        merchant_raw=merch,
+        merchant_key=merch_key,
+        description=desc,
+        category=cat,
+        type=tp,
+        is_recurring=is_recurring,
+        persona=persona,
+        income=round(float(income), 2),
+        source="synthetic",
+        currency="INR",
+        transaction_id=f"tx_{uid}_{row_idx}"
+    )
+
+
 def generate_transactions(
     n_users: int = SYNTH_N_USERS,
     months: int = SYNTH_MONTHS,
@@ -146,13 +178,14 @@ def generate_transactions(
 ) -> pd.DataFrame:
     """Return a transaction-level DataFrame.
 
-    Columns: user_id, date, amount, merchant, description, category, type, is_recurring,
-             persona, income
+    Columns: user_id, timestamp, date, amount, direction, merchant, merchant_raw, merchant_key,
+             description, category, type, is_recurring, persona, income, source, currency, transaction_id
     """
     rng = _rng(seed)
     persona_names = list(PERSONAS.keys())
     start_ts = pd.Timestamp(start)
     rows: list[dict] = []
+    row_count = 0
 
     for uid in range(n_users):
         persona = persona_names[uid % len(persona_names)] if uid < len(persona_names) \
@@ -183,20 +216,18 @@ def generate_transactions(
             moy = date0.month - 1
 
             # Income (1 salary + occasional bonus/freelance).
-            sal_day = date0.replace(day=1) + pd.Timedelta(days=int(rng.integers(0, 3)))
-            rows.append(dict(user_id=uid, date=sal_day, amount=round(income, 2),
-                             merchant="Salary Credit",
-                             description=_make_description(rng, "Salary Credit"),
-                             category=INCOME_CATEGORY, type="income", is_recurring=True,
-                             persona=persona, income=round(income, 2)))
+            sal_day = _make_timestamp(rng, date0.replace(day=1) + pd.Timedelta(days=int(rng.integers(0, 3))))
+            row_count += 1
+            rows.append(_make_row(uid, sal_day, income, "Salary Credit",
+                                  _make_description(rng, "Salary Credit"),
+                                  INCOME_CATEGORY, "income", True, persona, income, row_count))
             if rng.random() < 0.15:
                 bonus_m = rng.choice(["Bonus", "Freelance Payout", "Interest Credit"])
-                rows.append(dict(user_id=uid,
-                                 date=sal_day + pd.Timedelta(days=int(rng.integers(3, 20))),
-                                 amount=round(income * rng.uniform(0.1, 0.5), 2),
-                                 merchant=bonus_m, description=_make_description(rng, bonus_m),
-                                 category=INCOME_CATEGORY, type="income", is_recurring=False,
-                                 persona=persona, income=round(income, 2)))
+                bonus_day = _make_timestamp(rng, sal_day + pd.Timedelta(days=int(rng.integers(3, 20))))
+                row_count += 1
+                rows.append(_make_row(uid, bonus_day, income * rng.uniform(0.1, 0.5),
+                                      bonus_m, _make_description(rng, bonus_m),
+                                      INCOME_CATEGORY, "income", False, persona, income, row_count))
 
             for c in EXPENSE_CATEGORIES:
                 growth = (1.0 + trend[c]) ** m
@@ -209,22 +240,20 @@ def generate_transactions(
                     # One (or few) fixed recurring charges.
                     amt = recurring_amt[c] * growth * rng.uniform(0.98, 1.02)
                     merch = rng.choice(MERCHANTS[c])
-                    day = date0.replace(day=min(int(rng.integers(1, 6)), 28))
-                    rows.append(dict(user_id=uid, date=day, amount=round(amt, 2),
-                                     merchant=merch, description=_make_description(rng, merch),
-                                     category=c, type="expense", is_recurring=True,
-                                     persona=persona, income=round(income, 2)))
+                    day = _make_timestamp(rng, date0.replace(day=min(int(rng.integers(1, 6)), 28)))
+                    row_count += 1
+                    rows.append(_make_row(uid, day, amt, merch, _make_description(rng, merch),
+                                          c, "expense", True, persona, income, row_count))
                     # A couple of extra subscriptions for realism.
                     if c == "subscriptions" and rng.random() < 0.7:
                         for _ in range(int(rng.integers(1, 4))):
                             merch2 = rng.choice(MERCHANTS[c])
                             amt2 = amt * rng.uniform(0.1, 0.4)
-                            day2 = date0.replace(day=min(int(rng.integers(1, 26)), 28))
-                            rows.append(dict(user_id=uid, date=day2, amount=round(amt2, 2),
-                                             merchant=merch2,
-                                             description=_make_description(rng, merch2),
-                                             category=c, type="expense", is_recurring=True,
-                                             persona=persona, income=round(income, 2)))
+                            day2 = _make_timestamp(rng, date0.replace(day=min(int(rng.integers(1, 26)), 28)))
+                            row_count += 1
+                            rows.append(_make_row(uid, day2, amt2, merch2,
+                                                  _make_description(rng, merch2),
+                                                  c, "expense", True, persona, income, row_count))
                     continue
 
                 # Variable category: split monthly total into several transactions.
@@ -237,15 +266,16 @@ def generate_transactions(
                     if amt < 1:
                         continue
                     merch = rng.choice(MERCHANTS[c])
-                    day = date0 + pd.Timedelta(days=int(rng.integers(0, 27)))
-                    rows.append(dict(user_id=uid, date=day, amount=round(float(amt), 2),
-                                     merchant=merch, description=_make_description(rng, merch),
-                                     category=c, type="expense", is_recurring=False,
-                                     persona=persona, income=round(income, 2)))
+                    day = _make_timestamp(rng, date0 + pd.Timedelta(days=int(rng.integers(0, 27))))
+                    row_count += 1
+                    rows.append(_make_row(uid, day, float(amt), merch,
+                                          _make_description(rng, merch),
+                                          c, "expense", False, persona, income, row_count))
 
     df = pd.DataFrame(rows)
-    df["date"] = pd.to_datetime(df["date"])
-    df = df.sort_values(["user_id", "date"]).reset_index(drop=True)
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["date"] = df["timestamp"]
+    df = df.sort_values(["user_id", "timestamp"]).reset_index(drop=True)
     return df
 
 
