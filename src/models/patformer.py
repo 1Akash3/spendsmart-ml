@@ -70,16 +70,38 @@ class PATFormer(nn.Module):
         )
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers)
         
-        # Global Predictor Head
-        self.global_head = nn.Sequential(
+        # Multi-task Predictor Heads
+        self.head_category = nn.Sequential(
             nn.Linear(d_model, d_model // 2),
             nn.ReLU(),
-            nn.Linear(d_model // 2, num_categories) # Predicts next category/amounts
+            nn.Linear(d_model // 2, num_categories) # Task 1: next transaction category
+        )
+        self.head_amount = nn.Sequential(
+            nn.Linear(d_model, d_model // 2),
+            nn.ReLU(),
+            nn.Linear(d_model // 2, 1) # Task 2: next transaction amount
+        )
+        self.head_forecast = nn.Sequential(
+            nn.Linear(d_model, d_model // 2),
+            nn.ReLU(),
+            nn.Linear(d_model // 2, num_categories) # Task 3: future category expenditure
+        )
+        self.head_recurring = nn.Sequential(
+            nn.Linear(d_model, d_model // 2),
+            nn.ReLU(),
+            nn.Linear(d_model // 2, 1), # Task 4: recurring-payment probability
+            nn.Sigmoid()
+        )
+        self.head_overspend = nn.Sequential(
+            nn.Linear(d_model, d_model // 2),
+            nn.ReLU(),
+            nn.Linear(d_model // 2, 1), # Task 5: overspend probability
+            nn.Sigmoid()
         )
         
-        # Personal Predictor Head (Local expert - could be another layer)
+        # Personal Predictor Head (Local expert for next category/amount)
         if self.use_router:
-            self.personal_head = nn.Sequential(
+            self.personal_head_category = nn.Sequential(
                 nn.Linear(d_model, d_model // 2),
                 nn.ReLU(),
                 nn.Linear(d_model // 2, num_categories)
@@ -117,15 +139,33 @@ class PATFormer(nn.Module):
         # Take the last sequence output for prediction
         last_out = output[:, -1, :] # (batch_size, d_model)
         
-        global_pred = self.global_head(last_out)
+        # Multi-task outputs
+        pred_category = self.head_category(last_out)
+        pred_amount = self.head_amount(last_out)
+        pred_forecast = self.head_forecast(last_out)
+        pred_recurring = self.head_recurring(last_out)
+        pred_overspend = self.head_overspend(last_out)
         
         if self.use_router and user_context is not None:
-            personal_pred = self.personal_head(last_out)
+            personal_pred_cat = self.personal_head_category(last_out)
             w_global, w_personal = self.router(user_context)
             w_global = w_global.unsqueeze(-1)
             w_personal = w_personal.unsqueeze(-1)
             
-            final_pred = (w_global * global_pred) + (w_personal * personal_pred)
-            return final_pred
+            final_pred_cat = (w_global * pred_category) + (w_personal * personal_pred_cat)
+            
+            return {
+                "category": final_pred_cat,
+                "amount": pred_amount,
+                "forecast": pred_forecast,
+                "recurring": pred_recurring,
+                "overspend": pred_overspend
+            }
         
-        return global_pred
+        return {
+            "category": pred_category,
+            "amount": pred_amount,
+            "forecast": pred_forecast,
+            "recurring": pred_recurring,
+            "overspend": pred_overspend
+        }

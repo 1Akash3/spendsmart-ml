@@ -1,0 +1,76 @@
+# SpendSmart ML Codebase Audit Report
+
+## 1. File Details (Classes, Methods, Functions, Error Points, Dependencies)
+
+**`config.py`**
+*   **Classes/Methods:** None
+*   **Functions:** None
+*   **Error Points:** Hardcoded currency symbol (`₹`) might not render properly in all terminals. Assumes `RAW_DIR`, `SYNTH_DIR`, `ARTIFACTS_DIR`, `REPORTS_DIR` can be created in the current structure.
+*   **Dependencies:** `pathlib.Path`
+
+**`requirements.txt`**
+*   **Error Points:** Optional dependencies (`datasets`, `sentence-transformers`, `torch`, `kagglehub`) are commented or not strictly required for the base pipeline but are necessary for certain flags (e.g., `--real-categorizer`).
+
+**`src/categorizer.py`**
+*   **Classes & Methods:**
+    *   `TransactionCategorizer` — `__init__`, `fit`, `predict`, `predict_with_confidence`, `evaluate`, `save`, `load`
+    *   `HybridTransactionCategorizer` — `__init__`, `_embed`, `fit`, `predict`, `predict_with_confidence`, `evaluate`, `save`, `load`
+*   **Functions:** `_build_pipeline()`
+*   **Error Points:** `HybridTransactionCategorizer` lacks fallback if `sentence_transformers` or `torch` are not installed.
+*   **Dependencies:** `joblib`, `numpy`, `sklearn`, `sentence_transformers`, `torch`, `config.py`.
+
+**`src/train.py`**
+*   **Functions:** `_log`, `build_static_features`, `run`, `_print_summary`, `main`
+*   **Error Points:** Uses `sys.path.insert` for imports. Calling `--real-categorizer` without `sentence-transformers` installed will crash.
+*   **Dependencies:** `argparse`, `json`, `time`, `numpy`, `pandas`, `sklearn`, all src modules.
+
+**`src/features.py`**
+*   **Functions:** `build_monthly_panel`, `build_user_profiles`, `build_forecast_frame`, `build_serving_frame`, `feature_columns`
+*   **Error Points:** `build_user_profiles` handles zero-division with `+ 1e-9`. `build_monthly_panel` hardcodes 1.1x total expense for missing income proxy.
+
+**`src/segmentation.py`**
+*   **Classes:** `UserSegmenter` — `fit`, `predict`, `assign`, `save`, `load`
+*   **Error Points:** KMeans can fail if too few samples. `silhouette_score` failure returns NaN.
+
+**`src/forecaster.py`**
+*   **Classes:** `PersonalizedForecaster` — `fit`, `predict`, `predict_by_user_category`, `save`, `load`
+*   **Error Points:** Falls back to global mean if <40 rows per category.
+
+**`src/recommender.py`**
+*   **Classes:** `Recommendation` (dataclass), `PersonalizedRecommender` — `recommend`, `_reallocation_plan`, `RealTimeState` — `update`, `_project`, `projected_month_end`
+*   **Error Points:** Zero division mitigated with `+ 1e-9`.
+
+**`src/evaluate.py`**
+*   **Functions:** `_mae`, `_mape`, `_wape`, `_smape`, `_time_split_months`, `_time_split_peruser`, `backtest_forecaster`, `evaluate_overspend_detector`
+*   **Error Points:** All divisions guarded.
+
+**`src/data_sources.py`**
+*   **Classes:** `DatasetSpec` (dataclass)
+*   **Functions:** `normalize_category`, `load_hf_transaction_categorization`, `load_real_transactions`, `load_pf_tracker_transactions`, `load_all_real_transactions`, `load_indian_bank_transactions`, `load_indian_profiles`, `load_indian_labeled`, `load_all_labeled_descriptions`, `load_kaggle`, `print_catalog`
+*   **Error Points:** `kagglehub` and `datasets` are imported lazily but throw `ModuleNotFoundError` if not installed. Missing `kaggle.json` credentials break real dataset loaders.
+
+**`src/infer_unlabeled.py`**
+*   **Functions:** `_load_pdf_descriptions`, `main`
+*   **Error Points:** Fails without `pdfplumber`. Expects `HybridTransactionCategorizer` model saved.
+
+## 2. Full Pipeline Flow
+
+1. Data Loading (synth.py or data_sources.py)
+2. Categorization Training (categorizer.py)
+3. Feature Engineering (features.py → monthly panel + user profiles)
+4. Segmentation (segmentation.py → KMeans cohorts)
+5. Forecasting & Backtesting (evaluate.py + forecaster.py)
+6. Recommender Evaluation (evaluate.py → overspend detector)
+7. Final Forecasting (forecaster.py → predict next month)
+8. Recommendation Generation (recommender.py)
+9. Persistence (joblib + JSON metrics)
+
+## 3. Key Model Differences
+
+**TransactionCategorizer:** TF-IDF (word+char n-grams) → LogisticRegression. CPU-only, fast.
+**HybridTransactionCategorizer:** TF-IDF + SentenceTransformer embeddings → LogisticRegression. Requires PyTorch.
+
+## 4. Evaluation Metrics Available
+
+**Forecaster:** MAE, WAPE, sMAPE, MAPE, skill_vs_naive, per_category_mae
+**Overspend Detector:** precision, recall, F1 (model vs naive baseline)
