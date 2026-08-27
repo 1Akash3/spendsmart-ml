@@ -1,0 +1,105 @@
+{
+  "dataset": "priyamchoksi/credit-card-transactions-dataset (Kaggle, REAL)",
+  "n_transactions": 1296675,
+  "n_users": 983,
+  "n_months": 18,
+  "categorizer": {
+    "accuracy": 0.99165,
+    "macro_f1": 0.9911899802567119,
+    "weighted_f1": 0.9916783047675611,
+    "n_test": 40000
+  },
+  "categorizer_n_train": 160000,
+  "segmentation": {
+    "n_cohorts": 6,
+    "silhouette": 0.3651
+  },
+  "forecaster": {
+    "n_train_rows": 119856,
+    "n_test_rows": 29964,
+    "cutoff_month": "2020-04-01",
+    "model_mae": 236.06,
+    "naive_mae": 295.05,
+    "rolling_mean_mae": 244.53,
+    "model_mape": 4.6951,
+    "naive_mape": 4.4677,
+    "skill_vs_naive": 0.1999,
+    "per_category_mae": {
+      "food_dining": {
+        "model_mae": 138.71,
+        "naive_mae": 178.96,
+        "n": 2724
+      },
+      "groceries": {
+        "model_mae": 334.21,
+        "naive_mae": 406.14,
+        "n": 2724
+      },
+      "transportation": {
+        "model_mae": 425.43,
+        "naive_mae": 511.17,
+        "n": 2724
+      },
+      "shopping": {
+        "model_mae": 717.52,
+        "naive_mae": 920.34,
+        "n": 2724
+      },
+      "entertainment": {
+        "model_mae": 170.89,
+        "naive_mae": 225.49,
+        "n": 2724
+      },
+      "healthcare": {
+        "model_mae": 135.93,
+        "naive_mae": 174.02,
+        "n": 2724
+      },
+      "utilities": {
+        "model_mae": 0.0,
+        "naive_mae": 0.0,
+        "n": 2724
+      },
+      "housing": {
+        "model_mae": 173.88,
+        "naive_mae": 228.94,
+        "n": 2724
+      },
+      "subscriptions": {
+        "model_mae": 0.0,
+        "naive_mae": 0.0,
+        "n": 2724
+      },
+      "financial": {
+        "model_mae": 0.0,
+        "naive_mae": 0.0,
+        "n": 2724
+      },
+      "misc": {
+        "model_mae": 500.13,
+        "naive_mae": 600.44,
+        "n": 2724
+      }
+    }
+  },
+  "overspend_detector": {
+    "n_test_rows": 29964,
+    "positive_rate": 0.219,
+    "model": {
+      "precision": 0.48,
+      "recall": 0.6686,
+      "f1": 0.5588,
+      "tp": 4388,
+      "fp": 4754,
+      "fn": 2175
+    },
+    "naive_baseline": {
+      "precision": 0.2974,
+      "recall": 0.3698,
+      "f1": 0.3296,
+      "tp": 2427,
+      "fp": 5735,
+      "fn": 4136
+    }
+  }
+}

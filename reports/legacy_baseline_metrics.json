@@ -1,0 +1,195 @@
+{
+  "config": {
+    "source": "combined",
+    "seed": 42
+  },
+  "categorizer": {
+    "accuracy": 0.9104477611940298,
+    "macro_f1": 0.9058318925250447,
+    "weighted_f1": 0.9108952701177561,
+    "n_test": 1742
+  },
+  "segmentation": {
+    "n_cohorts": 6,
+    "silhouette": 0.2301
+  },
+  "forecaster": {
+    "n_train_rows": 387310,
+    "n_test_rows": 18755,
+    "cutoff_month": "per-user-last-month",
+    "model_mae": 271.25,
+    "naive_mae": 291.43,
+    "rolling_mean_mae": 263.34,
+    "model_wape": 0.7744,
+    "naive_wape": 0.832,
+    "model_smape": 1.3545,
+    "model_mape_ref": 6.8074,
+    "skill_vs_naive": 0.0692,
+    "per_category_mae": {
+      "food_dining": {
+        "model_mae": 147.89,
+        "naive_mae": 164.07,
+        "n": 1705
+      },
+      "groceries": {
+        "model_mae": 297.96,
+        "naive_mae": 293.59,
+        "n": 1705
+      },
+      "transportation": {
+        "model_mae": 309.99,
+        "naive_mae": 351.73,
+        "n": 1705
+      },
+      "shopping": {
+        "model_mae": 414.79,
+        "naive_mae": 491.41,
+        "n": 1705
+      },
+      "entertainment": {
+        "model_mae": 172.88,
+        "naive_mae": 191.17,
+        "n": 1705
+      },
+      "healthcare": {
+        "model_mae": 152.09,
+        "naive_mae": 163.09,
+        "n": 1705
+      },
+      "utilities": {
+        "model_mae": 65.96,
+        "naive_mae": 63.32,
+        "n": 1705
+      },
+      "housing": {
+        "model_mae": 642.57,
+        "naive_mae": 685.09,
+        "n": 1705
+      },
+      "subscriptions": {
+        "model_mae": 0.0,
+        "naive_mae": 0.0,
+        "n": 1705
+      },
+      "financial": {
+        "model_mae": 214.78,
+        "naive_mae": 221.28,
+        "n": 1705
+      },
+      "misc": {
+        "model_mae": 564.89,
+        "naive_mae": 580.99,
+        "n": 1705
+      }
+    }
+  },
+  "recommender_eval": {
+    "n_test_rows": 18755,
+    "positive_rate": 0.0806,
+    "model": {
+      "precision": 0.3261,
+      "recall": 0.6422,
+      "f1": 0.4325,
+      "tp": 971,
+      "fp": 2007,
+      "fn": 541
+    },
+    "naive_baseline": {
+      "precision": 0.1955,
+      "recall": 0.3016,
+      "f1": 0.2373,
+      "tp": 456,
+      "fp": 1876,
+      "fn": 1056
+    }
+  },
+  "sample_recommendation": {
+    "user_id": "cc_180011453250192",
+    "cohort": 2,
+    "summary": {
+      "avg_income": 12068.96,
+      "projected_expense": 12309.87,
+      "projected_savings_rate": -0.02,
+      "history_months": 18
+    },
+    "forecast": {
+      "food_dining": 646.64,
+      "groceries": 1818.28,
+      "transportation": 2623.19,
+      "shopping": 2766.13,
+      "entertainment": 890.45,
+      "healthcare": 613.69,
+      "utilities": 1.29,
+      "housing": 1252.21,
+      "subscriptions": 0.0,
+      "financial": 0.89,
+      "misc": 1697.1
+    },
+    "recommendations": [
+      {
+        "kind": "reallocation",
+        "category": "misc",
+        "title": "Plan to hit a 25% savings goal",
+        "detail": "Cutting Shopping \u2212\u20b9573, Entertainment \u2212\u20b9282, Miscellaneous \u2212\u20b9276, Food & Dining \u2212\u20b9259 recovers \u20b91,389/mo, but the goal needs \u20b93,258 \u2014 consider a gentler target or boosting income.",
+        "monthly_impact": 1388.64,
+        "confidence": 0.9,
+        "priority": 1319.208,
+        "category_label": "Miscellaneous"
+      },
+      {
+        "kind": "overspend",
+        "category": "shopping",
+        "title": "Shopping trending above your usual",
+        "detail": "Projected \u20b92,766 next month vs your typical \u20b91,939 (2.2\u03c3 high). Trimming here saves ~\u20b9827.",
+        "monthly_impact": 827.3695571241112,
+        "confidence": 0.7283644843370393,
+        "priority": 714.9980789774895,
+        "category_label": "Shopping"
+      },
+      {
+        "kind": "overspend",
+        "category": "transportation",
+        "title": "Transportation trending above your usual",
+        "detail": "Projected \u20b92,623 next month vs your typical \u20b91,797 (1.7\u03c3 high). Trimming here saves ~\u20b9826.",
+        "monthly_impact": 825.9242053839589,
+        "confidence": 0.5675062918735889,
+        "priority": 647.320694275025,
+        "category_label": "Transportation"
+      },
+      {
+        "kind": "overspend",
+        "category": "groceries",
+        "title": "Groceries trending above your usual",
+        "detail": "Projected \u20b91,818 next month vs your typical \u20b91,219 (2.0\u03c3 high). Trimming here saves ~\u20b9599.",
+        "monthly_impact": 599.0934246518061,
+        "confidence": 0.6786415200333175,
+        "priority": 502.8315484997368,
+        "category_label": "Groceries"
+      },
+      {
+        "kind": "overspend",
+        "category": "misc",
+        "title": "Miscellaneous trending above your usual",
+        "detail": "Projected \u20b91,697 next month vs your typical \u20b91,268 (2.9\u03c3 high). Trimming here saves ~\u20b9429.",
+        "monthly_impact": 429.04328156837096,
+        "confidence": 0.9616354046638507,
+        "priority": 420.8132456288389,
+        "category_label": "Miscellaneous"
+      }
+    ],
+    "plan": {
+      "target_savings": 3017.24,
+      "projected_savings": -240.9,
+      "gap": 3258.14,
+      "cuts": {
+        "shopping": 572.52,
+        "entertainment": 281.94,
+        "misc": 275.53,
+        "food_dining": 258.66
+      },
+      "shortfall_closed": 1388.64,
+      "feasible": false,
+      "summary": "Cutting Shopping \u2212\u20b9573, Entertainment \u2212\u20b9282, Miscellaneous \u2212\u20b9276, Food & Dining \u2212\u20b9259 recovers \u20b91,389/mo, but the goal needs \u20b93,258 \u2014 consider a gentler target or boosting income."
+    }
+  }
+}

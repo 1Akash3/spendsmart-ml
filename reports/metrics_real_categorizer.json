@@ -1,0 +1,11 @@
+{
+  "dataset": "razisayyed/expense-extraction-dataset (HuggingFace, public)",
+  "model": "TF-IDF word+char n-grams -> LogisticRegression",
+  "n_total_usable": 1262,
+  "n_train": 1009,
+  "n_test": 253,
+  "accuracy": 0.9525691699604744,
+  "macro_f1": 0.957868385424552,
+  "weighted_f1": 0.9528442117972455,
+  "n_classes": 9
+}

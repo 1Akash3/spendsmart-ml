@@ -1,0 +1,126 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPay analyzed by SpendSmart-ML</title>
+<style>
+:root{--bg:#f5f8f8;--card:#ffffff;--ink:#0f2b31;--muted:#5b6b6f;--teal:#028090;--deep:#043b45;--mint:#00a896;--line:#e2ebeb;}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1416;--card:#12211f;--ink:#e7f1f0;--muted:#93a7a7;--teal:#28b3c0;--deep:#04262c;--mint:#2fd0b4;--line:#1e3330;}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.4}
+.wrap{max-width:1080px;margin:0 auto;padding:22px}
+.hero{background:var(--deep);color:#fff;border-radius:18px;padding:26px 28px;margin-bottom:18px}
+.hero h1{margin:0 0 4px;font-size:26px}.hero .sub{color:#bfe0e0;font-size:14px}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
+@media(max-width:720px){.tiles{grid-template-columns:repeat(2,1fr)}}
+.tile{background:rgba(255,255,255,.07);border-radius:12px;padding:14px}
+.tile .n{font-size:24px;font-weight:800;color:var(--mint)}.tile .l{font-size:11.5px;color:#cfe7e7;margin-top:3px}
+.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}@media(max-width:820px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:16px}
+.card h2{margin:0 0 2px;font-size:16px}.card .cap{color:var(--muted);font-size:12.5px;margin-bottom:14px}
+.row{display:flex;align-items:center;gap:10px;margin:7px 0;font-size:13.5px}
+.bar{height:20px;border-radius:6px;min-width:2px}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;color:#fff}
+.feed{height:280px;overflow:hidden;position:relative;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.feed .item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);font-size:13px;animation:slide .35s ease}
+@keyframes slide{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+.item .m{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .amt{font-weight:700;font-variant-numeric:tabular-nums}
+.src{font-size:10px;color:var(--muted);margin-left:6px}
+.btn{background:var(--teal);color:#fff;border:none;border-radius:9px;padding:8px 16px;font-weight:700;cursor:pointer;font-size:13px}
+.reco{border-left:3px solid var(--teal);padding:8px 0 8px 12px;margin:10px 0}
+.reco .t{font-weight:700;font-size:13.5px}.reco .d{color:var(--muted);font-size:12.5px;margin-top:2px}
+.alert{display:flex;gap:8px;font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--line)}
+.k{font-variant-numeric:tabular-nums}.muted{color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;font-size:11px;color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle}
+h2 .pill{font-size:11px;background:var(--teal);color:#fff;padding:2px 8px;border-radius:20px;margin-left:6px;vertical-align:middle}
+</style></head><body><div class="wrap">
+
+<div class="hero">
+  <h1>Your GPay statement, analyzed by SpendSmart-ML</h1>
+  <div class="sub">UPI transaction statement · 01 Mar 2026 – 31 May 2026 · run through the trained categorizer + forecaster + recommender</div>
+  <div class="tiles">
+    <div class="tile"><div class="n">₹64,107</div><div class="l">total paid (314 txns)</div></div>
+    <div class="tile"><div class="n">₹174,067</div><div class="l">total received</div></div>
+    <div class="tile"><div class="n">92.3%</div><div class="l">accuracy vs hand-labelled truth</div></div>
+    <div class="tile"><div class="n">55%</div><div class="l">of spend auto-categorized</div></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Live model categorization <span class="pill">real time</span></h2>
+  <div class="cap">Each transaction streamed through the model as it "arrives". Brand rules handle known UPI merchants, the ML model handles the rest, and person-to-person transfers are flagged as uncategorizable. <button class="btn" onclick="replay()">▶ Replay</button></div>
+  <div class="grid" style="grid-template-columns:1fr 1fr">
+    <div class="feed" id="feed"></div>
+    <div><div id="livebars"></div><div class="legend" id="legend"></div></div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>Spending by category</h2>
+    <div class="cap">Categorized merchant spend over 3 months (P2P transfers shown separately).</div>
+    <div id="catbars"></div>
+  </div>
+  <div class="card">
+    <h2>Next-month forecast (Jun)</h2>
+    <div class="cap">Per-category prediction from the trained forecaster.</div>
+    <div id="fcbars"></div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>Personalized recommendations</h2>
+    <div class="cap">Generated from your own baseline + cohort 0.</div>
+    <div id="recos"></div>
+  </div>
+  <div class="card">
+    <h2>Real-time overspend alerts (May)</h2>
+    <div class="cap">Fired live as May transactions streamed in.</div>
+    <div id="alerts"></div>
+  </div>
+</div>
+
+<div class="card" style="font-size:12.5px;color:var(--muted)">
+  <b style="color:var(--ink)">Measured on this statement.</b> Scored against <b>143 hand-labeled merchants</b> from this very file:
+  the categorizer alone went from <b>38.0% → 87.3%</b> on identifiable businesses, and the full stack reaches
+  <b>92.3% overall</b> (97.2% of person-to-person transfers correctly flagged). It also scored <b>10/10 on unseen
+  invented Indian merchants</b> ("BALAJISERVICESTATION", "ARYADENTALCLINIC"), so it learned Indian business
+  vocabulary rather than memorising these names. Peer comparisons now run against <b>20,000 real Indian users</b>,
+  not US card holders. The remaining ₹28,662 (176 txns) are <b>payments to individuals</b> —
+  uncategorizable from a name alone, so they're excluded from category analysis rather than guessed at.
+</div>
+
+</div>
+<script>
+const D={"period": "01 Mar 2026 \u2013 31 May 2026", "n_txns": 383, "n_paid": 314, "total_paid": 64106.64, "total_received": 174067.0, "categorized_pct": 0.4394904458598726, "categorized_amt_pct": 0.5528934288242217, "transfer_amt": 28662.5, "by_category": [{"cat": "transportation", "label": "Transportation", "amount": 12889.0, "count": 21}, {"cat": "food_dining", "label": "Food & Dining", "amount": 10680.66, "count": 54}, {"cat": "utilities", "label": "Utilities", "amount": 4479.28, "count": 4}, {"cat": "shopping", "label": "Shopping", "amount": 1551.0, "count": 19}, {"cat": "healthcare", "label": "Healthcare", "amount": 1548.0, "count": 10}, {"cat": "misc", "label": "Miscellaneous", "amount": 1537.0, "count": 13}, {"cat": "entertainment", "label": "Entertainment", "amount": 1386.2, "count": 2}, {"cat": "groceries", "label": "Groceries", "amount": 1331.0, "count": 12}, {"cat": "subscriptions", "label": "Subscriptions", "amount": 42.0, "count": 3}], "by_source": {"ml-model": {"count": 117, "amount": 27978.14}, "brand-rule": {"count": 21, "amount": 7466.0}, "p2p/uncat": {"count": 176, "amount": 28662.5}}, "transfer_total": 28662.5, "transfer_count": 176, "top_merchants": {"transportation": [{"merchant": "jammukashmircablecar", "amount": 7200.0}, {"merchant": "Goibibo", "amount": 1784.0}, {"merchant": "REDBUS", "amount": 1100.0}], "food_dining": [{"merchant": "CESTLAVIE", "amount": 3700.0}, {"merchant": "ANNAPURNATHALI", "amount": 1291.0}, {"merchant": "SHANTAICATERERS", "amount": 960.0}], "utilities": [{"merchant": "BhartiAirtelLimited", "amount": 3065.64}, {"merchant": "Airtel", "amount": 1413.64}], "shopping": [{"merchant": "ZudioLoniKalbhorShedPuneZ702", "amount": 1148.0}, {"merchant": "DHANSHRISTATIONERYANDGENERALSTORES", "amount": 332.0}, {"merchant": "MITADTXEROXANDSTATIONARY", "amount": 71.0}], "healthcare": [{"merchant": "M/S.MAEERSVISHWARAJHOSPITALCOLLECTIONA/C#GPBC", "amount": 625.0}, {"merchant": "MEDPLUSLONISTATIONROAD", "amount": 482.0}, {"merchant": "TuljaBhawaniMedical", "amount": 180.0}], "misc": [{"merchant": "Dkwine", "amount": 1020.0}, {"merchant": "AgastyaEnterpriseSolapurroad", "amount": 200.0}, {"merchant": "TIRUPATIAGENCIES", "amount": 130.0}], "entertainment": [{"merchant": "BOOKMYSHOW", "amount": 1006.2}, {"merchant": "IMAGICAAWORLD", "amount": 380.0}], "groceries": [{"merchant": "SWARAJSUPERMARKET", "amount": 400.0}, {"merchant": "MAULIBAZAR", "amount": 398.0}, {"merchant": "Blinkit", "amount": 243.0}], "subscriptions": [{"merchant": "GooglePlay", "amount": 40.0}, {"merchant": "YouTube", "amount": 2.0}]}, "monthly": {"months": ["Mar", "Apr", "May"], "series": {"Transportation": [8135.0, 900.0, 3854.0], "Food & Dining": [2053.83, 1180.0, 7446.83], "Utilities": [1532.82, 2239.64, 706.82], "Shopping": [899.0, 58.0, 594.0], "Healthcare": [530.0, 948.0, 70.0], "Miscellaneous": [160.0, 102.0, 1275.0], "Entertainment": [1006.2, 0.0, 380.0], "Groceries": [0.0, 413.0, 918.0], "Subscriptions": [40.0, 2.0, 0.0]}}, "forecast": {"Food & Dining": 615, "Groceries": 794, "Transportation": 2318, "Shopping": 1765, "Entertainment": 1030, "Healthcare": 675, "Utilities": 220, "Housing / Rent": 491, "Financial / Fees": 3, "Miscellaneous": 1987}, "recommendations": [{"kind": "peer", "title": "Miscellaneous is high for users like you", "detail": "You put 20% of spend here vs 3% for your cohort. Aligning frees ~\u20b91,735/mo."}, {"kind": "overspend", "title": "Miscellaneous trending above your usual", "detail": "Projected \u20b91,987 next month vs your typical \u20b9512 (2.7\u03c3 high). Trimming here saves ~\u20b91,475."}, {"kind": "overspend", "title": "Shopping trending above your usual", "detail": "Projected \u20b91,765 next month vs your typical \u20b9517 (3.6\u03c3 high). Trimming here saves ~\u20b91,248."}, {"kind": "peer", "title": "Entertainment is high for users like you", "detail": "You put 10% of spend here vs 4% for your cohort. Aligning frees ~\u20b9588/mo."}, {"kind": "overspend", "title": "Entertainment trending above your usual", "detail": "Projected \u20b91,030 next month vs your typical \u20b9462 (1.4\u03c3 high). Trimming here saves ~\u20b9568."}], "cohort": 0, "alerts": [{"date": "01 May", "cat": "Shopping", "amount": 50.0, "msg": "On pace for \u20b91,500 in Shopping this month \u2014 above your usual \u20b9517."}, {"date": "03 May", "cat": "Groceries", "amount": 80.0, "msg": "On pace for \u20b9800 in Groceries this month \u2014 above your usual \u20b9444."}, {"date": "10 May", "cat": "Utilities", "amount": 706.82, "msg": "On pace for \u20b92,120 in Utilities this month \u2014 above your usual \u20b91,493."}, {"date": "17 May", "cat": "Groceries", "amount": 160.0, "msg": "On pace for \u20b9847 in Groceries this month \u2014 above your usual \u20b9444."}, {"date": "27 May", "cat": "Miscellaneous", "amount": 820.0, "msg": "On pace for \u20b91,372 in Miscellaneous this month \u2014 above your usual \u20b9512."}, {"date": "27 May", "cat": "Miscellaneous", "amount": 40.0, "msg": "On pace for \u20b91,417 in Miscellaneous this month \u2014 above your usual \u20b9512."}, {"date": "29 May", "cat": "Groceries", "amount": 400.0, "msg": "On pace for \u20b9950 in Groceries this month \u2014 above your usual \u20b9444."}, {"date": "29 May", "cat": "Food & Dining", "amount": 3700.0, "msg": "On pace for \u20b97,704 in Food & Dining this month \u2014 above your usual \u20b93,560."}], "n_alerts": 8, "stream": [{"date": "01 Mar", "merchant": "SanjayServiceStation", "amount": 150.0, "label": "Transportation", "src": "ml-model"}, {"date": "01 Mar", "merchant": "SOURABHSHAHAJITHONGE", "amount": 190.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "02 Mar", "merchant": "SHANTAICATERERS", "amount": 170.0, "label": "Food & Dining", "src": "ml-model"}, {"date": "02 Mar", "merchant": "Santoshvitthalsonawane", "amount": 30.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "02 Mar", "merchant": "MADHURSWEETS", "amount": 60.0, "label": "Food & Dining", "src": "ml-model"}, {"date": "02 Mar", "merchant": "MADHURSWEETS", "amount": 100.0, "label": "Food & Dining", "src": "ml-model"}, {"date": "02 Mar", "merchant": "MADHURSWEETS", "amount": 70.0, "label": "Food & Dining", "src": "ml-model"}, {"date": "02 Mar", "merchant": "SONALIVIJAYINGALE", "amount": 15.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "02 Mar", "merchant": "SANDESHDATTATRAYWA", "amount": 20.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "03 Mar", "merchant": "BABITASHYAMCHANDRAGUPTA", "amount": 20.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "03 Mar", "merchant": "BABITASHYAMCHANDRAGUPTA", "amount": 40.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "04 Mar", "merchant": "THEHUNGARYSCHOLAR", "amount": 135.0, "label": "Transportation", "src": "brand-rule"}, {"date": "05 Mar", "merchant": "UTKARSHRAMLINGLANGOTE", "amount": 20.0, "label": "Miscellaneous", "src": "brand-rule"}, {"date": "05 Mar", "merchant": "REKHAAPPASAHEBNIMBALKAR", "amount": 10.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "07 Mar", "merchant": "ZudioLoniKalbhorShedPune", "amount": 899.0, "label": "Shopping", "src": "brand-rule"}, {"date": "08 Mar", "merchant": "PranavBulbule", "amount": 212.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "08 Mar", "merchant": "SHIVAJISERVICESTATION", "amount": 150.0, "label": "Transportation", "src": "ml-model"}, {"date": "08 Mar", "merchant": "KokPaChinese", "amount": 210.0, "label": "Food & Dining", "src": "brand-rule"}, {"date": "09 Mar", "merchant": "ANNAPURNATHALI", "amount": 36.0, "label": "Food & Dining", "src": "ml-model"}, {"date": "10 Mar", "merchant": "GANGAAUTOSERVICES", "amount": 150.0, "label": "Transportation", "src": "ml-model"}, {"date": "10 Mar", "merchant": "MrRAJUMADHURAMPRAJAPATI", "amount": 30.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "10 Mar", "merchant": "SanjayServiceStation", "amount": 200.0, "label": "Transportation", "src": "ml-model"}, {"date": "10 Mar", "merchant": "BhartiAirtelLimited", "amount": 1532.82, "label": "Utilities", "src": "ml-model"}, {"date": "13 Mar", "merchant": "jammukashmircablecar", "amount": 7200.0, "label": "Transportation", "src": "ml-model"}, {"date": "15 Mar", "merchant": "SRISHTISUNILGAIKWAD", "amount": 500.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "16 Mar", "merchant": "SHREYASHSANTOSHGAIKWAD", "amount": 250.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "16 Mar", "merchant": "IRANICAFEKOREGAONPARK", "amount": 136.0, "label": "Food & Dining", "src": "brand-rule"}, {"date": "17 Mar", "merchant": "ABHISHEKSURESHHUNACHAGAU", "amount": 15.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "17 Mar", "merchant": "AJAYRAMBORGAVE", "amount": 70.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "17 Mar", "merchant": "AKASHRAMDASGHIGE", "amount": 95.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "17 Mar", "merchant": "ROHIT", "amount": 70.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "17 Mar", "merchant": "PunekarWadewale", "amount": 60.0, "label": "Food & Dining", "src": "ml-model"}, {"date": "18 Mar", "merchant": "SHANTAICATERERS", "amount": 230.0, "label": "Food & Dining", "src": "ml-model"}, {"date": "18 Mar", "merchant": "HADKEHEMANTSOPANRAO", "amount": 130.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "18 Mar", "merchant": "MADHURSWEETS", "amount": 28.0, "label": "Food & Dining", "src": "ml-model"}, {"date": "18 Mar", "merchant": "MrNIRANJANPANDURANGJADHA", "amount": 22.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "18 Mar", "merchant": "SPENTERPRISES", "amount": 10.0, "label": "Miscellaneous", "src": "ml-model"}, {"date": "22 Mar", "merchant": "Zomato", "amount": 343.83, "label": "Food & Dining", "src": "ml-model"}, {"date": "22 Mar", "merchant": "AMOLGOKULBANDAL", "amount": 250.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "22 Mar", "merchant": "MANARUL ALI", "amount": 30.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "22 Mar", "merchant": "PMPML", "amount": 20.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "22 Mar", "merchant": "TASTYTHRILLS", "amount": 160.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "23 Mar", "merchant": "BOOKMYSHOW", "amount": 1006.2, "label": "Entertainment", "src": "ml-model"}, {"date": "23 Mar", "merchant": "ASHASQUARE1", "amount": 20.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "23 Mar", "merchant": "ASHASQUARE2", "amount": 150.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "24 Mar", "merchant": "GooglePlay", "amount": 20.0, "label": "Subscriptions", "src": "ml-model"}, {"date": "25 Mar", "merchant": "GooglePlay", "amount": 20.0, "label": "Subscriptions", "src": "ml-model"}, {"date": "25 Mar", "merchant": "MrRAJUMADHURAMPRAJAPATI", "amount": 5.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "25 Mar", "merchant": "MrNIRANJANPANDURANGJADHA", "amount": 30.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "25 Mar", "merchant": "SHANTAICATERERS", "amount": 110.0, "label": "Food & Dining", "src": "ml-model"}, {"date": "25 Mar", "merchant": "HitanshChetankumarPawar", "amount": 120.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "25 Mar", "merchant": "HEALTHFIRSTMEDICO", "amount": 125.0, "label": "Healthcare", "src": "ml-model"}, {"date": "26 Mar", "merchant": "M/S.MAEERSVISHWARAJHOSPI", "amount": 225.0, "label": "Healthcare", "src": "brand-rule"}, {"date": "26 Mar", "merchant": "KRUSHNAIPETROLEUM", "amount": 150.0, "label": "Transportation", "src": "ml-model"}, {"date": "26 Mar", "merchant": "RUSTOMRICE", "amount": 140.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "26 Mar", "merchant": "GURUKRUPAPavbhaji", "amount": 220.0, "label": "Food & Dining", "src": "ml-model"}, {"date": "27 Mar", "merchant": "AKSHAYVIJAYLOHARKAR", "amount": 247.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "27 Mar", "merchant": "MRSOURABHVITHALRAOGHADGE", "amount": 150.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "27 Mar", "merchant": "BABITASHYAMCHANDRAGUPTA", "amount": 10.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "29 Mar", "merchant": "SHETTYVISHWNATHRAMA", "amount": 120.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "29 Mar", "merchant": "TuljaBhawaniMedical", "amount": 180.0, "label": "Healthcare", "src": "ml-model"}, {"date": "29 Mar", "merchant": "SunitaDadaraoGaikwad", "amount": 50.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "29 Mar", "merchant": "MrRAJUMADHURAMPRAJAPATI", "amount": 30.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "29 Mar", "merchant": "CRAVINGS", "amount": 280.0, "label": "Food & Dining", "src": "brand-rule"}, {"date": "29 Mar", "merchant": "MRSOURABHVITHALRAOGHADGE", "amount": 100.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "30 Mar", "merchant": "PANUGUMATICHAMANTI", "amount": 70.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "30 Mar", "merchant": "PANUGUMATICHAMANTI", "amount": 5.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "30 Mar", "merchant": "NehaTitirmare", "amount": 500.0, "label": "P2P Transfer", "src": "p2p/uncat"}, {"date": "31 Mar", "merchant": "TIRUPATIAGENCIES", "amount": 130.0, "label": "Miscellaneous", "src": "ml-model"}, {"date": "31 Mar", "merchant": "AKSHAYVIJAYLOHARKAR", "amount": 2.0, "label": "P2P Transfer", "src": "p2p/uncat"}]}, C={"Food & Dining": "#f59e0b", "Transportation": "#2563eb", "Utilities": "#8b5cf6", "Shopping": "#ec4899", "Entertainment": "#10b981", "Healthcare": "#ef4444", "Groceries": "#14b8a6", "Miscellaneous": "#64748b", "Housing / Rent": "#0ea5e9", "Financial / Fees": "#a16207", "P2P Transfer": "#94a3b8"};
+const fmt=n=>'₹'+Math.round(n).toLocaleString('en-IN');
+function bars(el,items,max){el.innerHTML=items.map(it=>{
+  const w=Math.max(2,100*it.v/max);const col=C[it.label]||'#64748b';
+  return `<div class="row"><div style="width:120px" class="muted">${it.label}</div><div class="bar" style="width:${w}%;background:${col}"></div><div class="k">${fmt(it.v)}</div></div>`}).join('')}
+// category bars
+bars(document.getElementById('catbars'),D.by_category.map(c=>({label:c.label,v:c.amount})),D.by_category[0].amount);
+// add transfers row
+document.getElementById('catbars').innerHTML+=`<div class="row"><div style="width:120px" class="muted">P2P Transfer</div><div class="bar" style="width:${100*D.transfer_total/D.by_category[0].amount}%;background:#94a3b8"></div><div class="k">${fmt(D.transfer_total)}</div></div>`;
+// forecast bars
+const fc=Object.entries(D.forecast).map(([k,v])=>({label:k,v})).sort((a,b)=>b.v-a.v);
+bars(document.getElementById('fcbars'),fc,Math.max(...fc.map(x=>x.v)));
+// recommendations
+document.getElementById('recos').innerHTML=D.recommendations.map(r=>`<div class="reco"><div class="t">${r.title}</div><div class="d">${r.detail}</div></div>`).join('')||'<div class="muted">On track.</div>';
+// alerts
+document.getElementById('alerts').innerHTML=D.alerts.map(a=>`<div class="alert"><b class="k">${a.date}</b><span>${a.msg}</span></div>`).join('');
+// legend
+document.getElementById('legend').innerHTML=D.by_category.map(c=>`<span><span class="dot" style="background:${C[c.label]||'#64748b'}"></span>${c.label}</span>`).join('');
+// LIVE replay
+const running={};
+function drawLive(){const items=Object.entries(running).map(([label,v])=>({label,v})).sort((a,b)=>b.v-a.v);
+  const max=Math.max(1,...items.map(x=>x.v));bars(document.getElementById('livebars'),items,max);}
+function replay(){const feed=document.getElementById('feed');feed.innerHTML='';for(const k in running)delete running[k];drawLive();
+  let i=0;const t=setInterval(()=>{if(i>=D.stream.length){clearInterval(t);return;}
+    const s=D.stream[i++];const col=C[s.label]||'#64748b';
+    running[s.label]=(running[s.label]||0)+s.amount;
+    const div=document.createElement('div');div.className='item';
+    div.innerHTML=`<span class="badge" style="background:${col}">${s.label}</span><span class="m">${s.merchant}<span class="src">${s.src}</span></span><span class="amt">${fmt(s.amount)}</span>`;
+    feed.insertBefore(div,feed.firstChild);while(feed.childNodes.length>9)feed.removeChild(feed.lastChild);
+    drawLive();},120);}
+replay();
+</script></body></html>

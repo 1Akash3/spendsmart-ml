@@ -1,0 +1,17 @@
+[
+  {
+    "experiment_id": "EXP-0000",
+    "hypothesis": "Baseline evaluation of existing pipeline.",
+    "change": "None - Baseline generation.",
+    "dataset": "combined_real",
+    "split": "random_stratified",
+    "seed": 42,
+    "hyperparameters": {},
+    "model": "TransactionCategorizer + PersonalizedForecaster + KMeans",
+    "metrics": {},
+    "confidence_intervals": {},
+    "result": "Pending baseline generation",
+    "decision": "KEEP",
+    "reason": "Required as the reference point for all subsequent ablations."
+  }
+]
