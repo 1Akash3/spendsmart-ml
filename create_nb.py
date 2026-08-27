@@ -45,7 +45,7 @@ def add_code(text):
     })
 
 add_md("# 💸 SpendSmart-ML — Final Empirical Research Orchestrator\n## Google Colab GPU Edition")
-add_md("This notebook serves **only** as the execution orchestrator. All implementation logic exists in `src/` to ensure full reproducibility.\n\n### Execution Modes:\n- `SMOKE_TEST`: Rapid CPU-safe pipeline verification.\n- `DEVELOPMENT`: GPU hyperparameter sweeps & ablations.\n- `FINAL_LOCKED_TEST`: Immutable evaluation of the final chosen architecture.")
+add_md("This notebook serves **only** as the execution orchestrator. All implementation logic exists in `src/` to ensure full reproducibility.\n\n### Execution Modes:\n- `smoke`: Rapid CPU-safe pipeline software verification. *Never used for paper claims.*\n- `development`: GPU hyperparameter sweeps & ablations. Uses massive datasets.\n- `final`: Immutable evaluation of the final chosen architecture. Triggering this checks `reports/final_model_manifest.json`.")
 
 add_code('''import os
 import sys
@@ -75,11 +75,27 @@ from pathlib import Path
 from IPython.display import display, Markdown
 
 # Mode Selection
-MODE = "SMOKE_TEST" # Options: SMOKE_TEST, DEVELOPMENT, FINAL_LOCKED_TEST
-print(f"🔥 CURRENT EXECUTION MODE: {MODE}")
+MODE = "smoke" # Options: smoke, development, final
+print(f"🔥 CURRENT EXECUTION MODE: {MODE.upper()}")
+''')
 
-if MODE == "FINAL_LOCKED_TEST":
-    print("🔒 LOCKED TEST MODE INITIATED: Hyperparameters and Architecture Frozen.")
+add_md("## [Optional] Final Model Locking")
+add_md("If you are ready for the `final` execution, run the cell below to freeze your configuration. If you edit hyperparameters after this, the `final` test runner will crash!")
+add_code('''if MODE == "final":
+    from src.locked_test_guard import LockedTestGuard
+    # Freeze the architecture before the run
+    LockedTestGuard.create_manifest({
+        "architecture": "PATFormer",
+        "sequence_length": 64,
+        "embedding_dimension": 96,
+        "layers": 3,
+        "dropout": 0.15,
+        "learning_rate": 0.001,
+        "optimizer": "AdamW",
+        "batch_size": 16,
+        "preprocessing_version": "v1.0",
+        "dataset_hash": "mocked_data_hash_for_now"
+    })
 ''')
 
 add_md("## 1. Run Data Preprocessing & Splitting (Job 1)")
@@ -91,15 +107,15 @@ add_code('''!python src/run_baselines.py --mode {MODE}''')
 add_md("## 3. Run Neural Experiments (PATFormer & Ablations) (Job 4-9)")
 add_code('''!python src/run_neural_experiments.py --mode {MODE}''')
 
-add_md("## 4. Render Final Tables from Artifacts")
+add_md("## 4. Render Final Tables from Persisted Artifacts")
 add_code('''
-reports_dir = Path("reports/tables")
+reports_dir = Path(f"reports/results/{MODE}")
 if not reports_dir.exists():
-    print("No tables generated yet!")
+    print(f"No tables generated yet for mode: {MODE}!")
 else:
     for table_file in sorted(reports_dir.glob("*.csv")):
         df = pd.read_csv(table_file)
-        display(Markdown(f"### {table_file.stem}"))
+        display(Markdown(f"### {table_file.stem} ({MODE.upper()})"))
         display(df)
 ''')
 
