@@ -1,136 +1,100 @@
-# SpendSmart‑ML — Personalized Spending Recommendation Engine
+# SpendSmart‑ML V4 — Master Personalized Financial Intelligence Engine
 
-A **standalone** machine‑learning project (deliberately kept **outside** the main SpendSmart app)
-for training a model that produces **personalized**, per‑user financial recommendations from raw
-spending data — not generic "spend less on coffee" tips.
+A **publication-grade machine learning system** for personalized financial transaction categorization, multi-horizon spending forecasting, uncertainty estimation, distribution drift detection, and budget optimization.
 
-> Goal: given *this* user's own spending history, learn *their* baseline, forecast *their* next
-> month, compare against *their* goals and *their* peer cohort, and emit ranked, money‑quantified
-> actions — with **measurable, benchmarked accuracy** and a **real‑time (incremental) update** path.
+> Goal: Transform raw transaction feeds into empirical evidence, paper-ready publication artifacts (Tables 1–10, Figures 1–16), and sub-50ms production serving APIs with 100% reproducible execution.
 
 ---
 
-## Why this is "personalized" and not "generalized"
+## 🚀 SpendSmart V4 Quick Start
 
-Every recommendation is anchored to the individual, in three layers:
-
-1. **Self baseline** — the model learns each user's own per‑category mean / volatility / trend.
-   A flag fires only when *you* deviate from *your* normal, never from a global rule of thumb.
-2. **Personalized forecast** — a per‑category forecaster uses *your* lagged spend as its primary
-   signal, so predictions are conditioned on your history.
-3. **Cohort context ("users like you")** — unsupervised segmentation places you with financially
-   similar users, so peer comparisons are fair (a student isn't compared to a homeowner).
-
-The recommender then solves a small **budget‑reallocation optimization** bounded by *your own*
-category flexibility to hit *your* savings goal with minimal lifestyle disruption.
-
----
-
-## Pipeline
-
-```
-raw transactions ─┐
-                  ├─▶ [1] Categorizer      (TF‑IDF + linear model)     → accuracy / macro‑F1
-                  ├─▶ [2] Feature builder   (per‑user monthly panel)
-                  ├─▶ [3] Segmentation      (KMeans cohorts)            → silhouette
-                  ├─▶ [4] Forecaster        (per‑category HGBR + lags)  → MAE / MAPE vs baselines
-                  └─▶ [5] Recommender       (deviation + optimizer)     → precision@k backtest
-```
-
-Each stage reports a metric against a **naive baseline**, which is what makes the accuracy
-*proven* rather than asserted (see `src/evaluate.py`).
-
-## Real‑time optimization
-
-`recommender.RealTimeState` keeps rolling per‑category aggregates. When a new transaction arrives,
-`update()` refreshes them in **O(categories)** and re‑scores recommendations without any retrain —
-the batch models supply the learned parameters, the online layer applies them instantly.
-
----
-
-## Datasets
-
-Trains on **combined real data by default** (`data_sources.load_all_real_transactions()`):
-
-- **Kaggle `credit-card-transactions-dataset`** — ~1.3M real transactions, 983 users, 18 months: the rich per‑category expense backbone.
-- **Kaggle `personal-finance-tracker-dataset`** — 944 users: adds real monthly **income**, **housing**, **financial** (loan/investment) and **utilities**, so the panel covers income + every expense category (subscriptions stay label‑only — no real per‑user amounts exist publicly).
-- **Kaggle `indian-financial-transactions`** — ~500k transactions from Indian users, includes UPI merchant names and localized categories. *(https://www.kaggle.com/datasets/rajkumarrr/indian-financial-transactions)*
-- **HuggingFace `indian_finance/upi_transactions`** — curated UPI transaction dataset with over 200k entries, useful for Indian merchant lexicon. *(https://huggingface.co/datasets/indian_finance/upi_transactions)*
-- **Zindi `india-credit-card-transactions`** — competition dataset focusing on Indian credit‑card spending patterns. *(https://zindi.africa/competitions/india-credit-card-transactions)*
-- **Gov.in `pmjdy-transaction-data`** — government‑released PM Jan Dhan Yojana transaction data for financial inclusion research. *(https://data.gov.in/dataset/pmjdy-transaction-data)*
-
-Flags: `--cc-only` (credit‑card only) or `--synthetic` (offline, zero‑credential fallback via
-`src/synth.py`). Forecast accuracy is reported with **WAPE** (robust to $0‑spend months; plain MAPE
-is misleading on sparse categories). Full catalog: [`data/README.md`](data/README.md).
-
-Real data needs a Kaggle API token: create one at kaggle.com/settings → *Create New Token*, then
-place `kaggle.json` (or the `access_token`) under `~/.kaggle/`.
-
-### Indian / UPI support
-
-Statements from GPay, PhonePe and Paytm render merchants as space‑stripped strings
-(`SHIVAJISERVICESTATION`, `MADHURSWEETS`) that a Western‑merchant model cannot read. Three pieces
-handle this:
-
-| Piece | What it does |
-|---|---|
-| `src/indian_lexicon.py` | Real Indian brands + generic business‑type vocabulary, rendered in UPI shape as **training data** |
-| `src/upi_adapter.py` | Confident‑ML → curated brand rule → person‑name heuristic → `transfer` |
-| `data_sources.load_indian_profiles()` | 20,000 real Indian users → **Indian cohort norms** for fair peer comparison (`artifacts/segmenter_india.joblib`) |
-
-Measured on a **hand‑labelled real GPay statement** (143 merchants): the categorizer alone rose from
-**38.0% → 87.3%** on identifiable businesses; the full stack reaches **92.3% overall** with **97.2%**
-of person‑to‑person transfers correctly flagged. On ten *unseen invented* Indian merchant names it
-scored **10/10**, confirming it learned the naming conventions rather than memorising merchants.
-
-Payments to individuals carry no category and are labelled `transfer` rather than guessed at.
-
----
-
-## Run locally
-
+### 1. Run Data Preprocessing & Splitting Pipeline
 ```bash
-cd spendsmart-ml
-python -m venv .venv && . .venv/Scripts/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt kagglehub
-python -m src.train              # COMBINED real data by default: trains everything, writes reports/
-python -m src.train --cc-only    # real credit-card dataset only
-python -m src.train --synthetic  # offline fallback (no credentials)
+python -m src.run_data_pipeline --mode smoke
 ```
 
-Artifacts land in `artifacts/`, metrics in `reports/metrics.json`, a sample personalized
-recommendation is printed at the end.
+### 2. Execute Master Research Pipeline
+```bash
+python -m src.run_research_pipeline --mode smoke
+```
 
-## Run on Google Colab
+### 3. Run Benchmark Engine Only
+```bash
+python -m src.run_baselines --mode smoke
+```
 
-Open `notebooks/SpendSmart_Recommender_Colab.ipynb` in Colab and Run‑All. It installs deps, pulls
-the **real** Kaggle dataset (add your Kaggle token in the setup cell — or switch to `source="synthetic"`
-for a no‑credentials run), trains the full pipeline, and renders charts + a live personalized
-recommendation demo. See the notebook header for the one‑cell setup.
+### 4. Run PyTorch Unit & Integration Tests
+```bash
+pytest tests/ -v
+```
 
 ---
 
-## Layout
+## 📊 SpendSmart V4 Core Architecture
 
 ```
-spendsmart-ml/
-├── config.py                 # taxonomy, paths, hyperparameters
-├── requirements.txt
-├── data/README.md            # researched dataset catalog
-├── src/
-│   ├── synth.py              # persona-based synthetic transactions
-│   ├── data_sources.py       # real dataset registry + loaders
-│   ├── features.py           # monthly panel + per-user profiles
-│   ├── categorizer.py        # transaction categorization model
-│   ├── segmentation.py       # user cohort clustering
-│   ├── forecaster.py         # personalized per-category forecaster
-│   ├── recommender.py        # recommendation engine + real-time optimizer
-│   ├── evaluate.py           # metrics + baselines (proven accuracy)
-│   └── train.py              # end-to-end orchestration
-├── notebooks/
-│   └── SpendSmart_Recommender_Colab.ipynb
-└── tests/test_pipeline.py    # fast smoke test
+Raw Feed ──▶ [1] Data Pipeline (Canonical Schema, Hashing, Leakage Audit)
+            ├──▶ [2] Baseline Engine (A0-A5 Categorization, F0-F4 Forecasting)
+            ├──▶ [3] PATFormer Causal Transformer (PyTorch AMP, Cosine Scheduler, Checkpoints)
+            ├──▶ [4] Adaptive Personalization (Global, Personal, Cohort, Adaptive Router)
+            ├──▶ [5] Temporal Drift Engine (PSI, Wasserstein, KL Divergence)
+            ├──▶ [6] Robustness Suite (5%, 10%, 20% Noise Injections)
+            ├──▶ [7] Explainability & Counterfactual Engine (Permutation, Attention Heatmaps)
+            ├──▶ [8] Financial Health Score (Transparent 5-Component Breakdown)
+            ├──▶ [9] Multi-Seed Statistical Validation (Seeds 42-46, Bootstrap 95% CIs)
+            └──▶ [10] Publication Artifacts Generator (Tables 1–10, Figures 1–16, Cards)
 ```
 
-This project is intentionally decoupled from the SpendSmart web app. Nothing here imports from or
-writes to the main project; integration is a later, separate step.
+---
+
+## 🛠️ Execution Modes
+
+| Mode | Target | Description |
+|------|--------|-------------|
+| `smoke` | CPU / Local | Rapid software pipeline verification across 1–3 epochs. *Never used for final paper claims.* |
+| `development` | GPU / Colab | Hyperparameter sweeps, full dataset training, and multi-seed ablations. |
+| `final` | GPU / Locked | Immutable evaluation enforcing `LockedTestGuard` manifest verification. |
+
+---
+
+## 📄 Generated Paper Artifacts
+
+Executing the master research pipeline automatically produces publication-ready files:
+
+- **Tables 1–10**: CSV format under `reports/results/{mode}/` and `reports/tables/`
+- **Figures 1–16**: High-resolution 300 DPI PNG plots under `reports/figures/`
+- **Model Card**: [`reports/MODEL_CARD.md`](reports/MODEL_CARD.md)
+- **Data Card**: [`reports/DATA_CARD.md`](reports/DATA_CARD.md)
+- **Limitations**: [`reports/LIMITATIONS.md`](reports/LIMITATIONS.md)
+- **Error Analysis**: [`reports/ERROR_ANALYSIS.md`](reports/ERROR_ANALYSIS.md)
+- **Reproducibility Report**: [`reports/REPRODUCIBILITY.md`](reports/REPRODUCIBILITY.md)
+- **Paper Readiness Audit**: [`reports/PAPER_READINESS_AUDIT.md`](reports/PAPER_READINESS_AUDIT.md)
+
+---
+
+## 🌐 Production Serving Layer API
+
+SpendSmart V4 includes a production-ready serving layer (`src/serving.py`) with sub-50ms latency SLAs:
+
+```python
+from src.serving import SpendSmartServingAPI
+
+api = SpendSmartServingAPI("smoke")
+
+# 1. Categorize transaction
+tx_res = api.predict_transaction("Swiggy Order", amount=450.0)
+
+# 2. Monthly forecast
+fc_res = api.forecast_user(user_id="user_123")
+
+# 3. Financial Health Score
+health_res = api.health_score(user_id="user_123")
+```
+
+---
+
+## 🔬 Scientific Validation SLA
+
+- **Zero Mock Metrics**: Every F1, MAE, PSI, ECE, and p-value is computed directly from model predictions.
+- **Statistical Significance**: Paired t-tests and Wilcoxon signed-rank tests across 5 random seeds (42–46).
+- **Verification Gate**: Master execution fails automatically if any generated CSV, table, figure, or document is missing or empty.
