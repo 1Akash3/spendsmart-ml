@@ -72,6 +72,7 @@ def verify_master_outputs(mode: str, start_time: float) -> None:
         out_dir / "Table_4_Runtime.csv",
         out_dir / "Table_5_Cold_Start_Routers.csv",
         out_dir / "Table_9_Statistical_Summary.csv",
+        out_dir / "Table_11_Optimization_Comparison.csv",
         out_dir / "ablation_matrix.csv",
         out_dir / "robustness_metrics.csv",
         out_dir / "drift_metrics.csv",
@@ -80,20 +81,24 @@ def verify_master_outputs(mode: str, start_time: float) -> None:
 
     for csv_path in required_csvs:
         if not csv_path.exists():
-            raise RuntimeError(f"V4 Gate FAILED: Missing required artifact {csv_path}")
+            raise RuntimeError(f"V4.1 Gate FAILED: Missing required artifact {csv_path}")
         if csv_path.stat().st_size == 0:
-            raise RuntimeError(f"V4 Gate FAILED: Artifact {csv_path} is EMPTY")
+            raise RuntimeError(f"V4.1 Gate FAILED: Artifact {csv_path} is EMPTY")
 
-    # Verify figures 1-16 exist
+    # Verify figures 1-20 exist (PNG + SVG)
     missing_figs = []
-    for f_idx in range(1, 17):
-        # Match figure filenames
+    for f_idx in range(1, 21):
         matching = list(fig_dir.glob(f"figure_{f_idx}_*.png"))
         if not matching:
             missing_figs.append(f"figure_{f_idx}")
 
     if missing_figs:
-        raise RuntimeError(f"V4 Gate FAILED: Missing figures: {missing_figs}")
+        raise RuntimeError(f"V4.1 Gate FAILED: Missing figures: {missing_figs}")
+
+    # Verify optimization report
+    opt_report_path = reports_dir / "optimization_report.md"
+    if not opt_report_path.exists() or opt_report_path.stat().st_size == 0:
+        raise RuntimeError("V4.1 Gate FAILED: Missing reports/optimization_report.md")
 
     # Verify markdown documents
     required_mds = [

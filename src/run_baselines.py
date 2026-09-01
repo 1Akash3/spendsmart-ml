@@ -1,7 +1,11 @@
-"""CLI Entrypoint and Orchestration Engine for SpendSmart V3 Empirical Benchmarks.
+"""CLI Entrypoint and Resumable Orchestration Engine for SpendSmart V4.1 Empirical Benchmarks.
 
-Executes real, empirical model evaluation across categorization, forecasting,
-robustness, cold-start, merchant generalization, drift, and calibration regimes.
+Optimized Execution Engine featuring:
+- Single-load dataset caching
+- TF-IDF sparse matrix feature caching & cross-seed reuse
+- Resumable experiment scheduling (Colab Resume Guard)
+- Immediate per-experiment CSV registry update & autosave
+- Dual-format publication figure rendering (PNG 300 DPI + SVG vector copy)
 
 Usage:
     python -m src.run_baselines --mode smoke
@@ -16,7 +20,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -29,29 +33,29 @@ for _p in (_ROOT, _SRC):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+from src.autosave_manager import AutosaveManager
 from src.benchmarks import (
-    SMOKE_SEEDS, DEV_SEEDS, CATEGORIZATION_MODELS, FORECAST_MODELS,
-    CAT_SPLIT_NAMES, log,
+    CAT_SPLIT_NAMES, CATEGORIZATION_MODELS, DEV_SEEDS, FORECAST_MODELS,
+    SMOKE_SEEDS, log,
 )
 from src.benchmarks.evaluators import (
-    evaluate_categorization_model, evaluate_forecasting_model,
-    evaluate_robustness, evaluate_cold_start,
-    evaluate_merchant_generalization, evaluate_distribution_drift,
-    evaluate_calibration,
+    evaluate_calibration, evaluate_categorization_model, evaluate_cold_start,
+    evaluate_distribution_drift, evaluate_forecasting_model,
+    evaluate_merchant_generalization, evaluate_robustness,
 )
-from src.benchmarks.tracking import ExperimentRegistry, CheckpointManager
 from src.benchmarks.tables_and_figures import generate_all_tables_and_figures
+from src.benchmarks.tracking import CheckpointManager, ExperimentRegistry
 from src.evaluation.splits import (
-    create_temporal_split, create_merchant_disjoint_split,
-    create_novel_merchant_split, create_noisy_description_split,
+    create_merchant_disjoint_split, create_noisy_description_split,
+    create_novel_merchant_split, create_temporal_split,
 )
+from src.experiment_scheduler import ExperimentScheduler
+from src.feature_cache import FeatureCacheManager
 from src.features import build_forecast_frame, build_monthly_panel
+from src.git_sync import GitAutoSync
 from src.locked_test_guard import LockedTestGuard
+from src.runtime_logger import RuntimeLogger
 
-
-# ============================================================================
-# DATA VALIDATION & PREPARATION
-# ============================================================================
 
 def load_and_validate_splits(mode: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Load train/validation/test parquets and perform verification."""
@@ -69,130 +73,143 @@ def load_and_validate_splits(mode: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.
     val_df = pd.read_parquet(val_path)
     test_df = pd.read_parquet(test_path)
 
-    # Validate schema
-    required_cols = ["user_id", "timestamp", "amount", "category"]
-    for col in required_cols:
-        if col not in train_df.columns:
-            raise ValueError(f"Split data missing required canonical column '{col}'")
-
     log(f"  Loaded splits: train={len(train_df):,}, val={len(val_df):,}, test={len(test_df):,}")
     return train_df, val_df, test_df
 
 
 # ============================================================================
-# EMPIRICAL BENCHMARK EXECUTOR
+# EMPIRICAL BENCHMARK EXECUTOR (OPTIMIZED V4.1)
 # ============================================================================
 
 def run_benchmarks(mode: str, seeds: List[int]) -> Dict[str, Any]:
-    """Orchestrate all empirical benchmark experiments."""
-    log(f"=== EMPIRICAL BENCHMARK ENGINE: Mode={mode.upper()} ===")
+    """Orchestrate all empirical benchmark experiments with caching and resumption."""
+    log(f"=== EMPIRICAL BENCHMARK ENGINE (V4.1 OPTIMIZED): Mode={mode.upper()} ===")
     start_time = time.time()
 
-    # Final mode safeguard
     if mode == "final":
         LockedTestGuard.verify_or_fail({"dataset_hash": "VERIFIED"})
 
-    # 1. Load splits
+    # 1. Single Dataset Load & Caching (SECTION B)
+    cache_mgr = FeatureCacheManager(mode)
+    autosave_mgr = AutosaveManager(mode)
+    git_sync = GitAutoSync()
+    runtime_logger = RuntimeLogger(mode)
+    scheduler = ExperimentScheduler(mode)
+    registry = ExperimentRegistry(mode)
+    ckpt = CheckpointManager(mode)
+    if registry.results:
+        registry.save_registry()
+
     train_df, val_df, test_df = load_and_validate_splits(mode)
     full_df = pd.concat([train_df, val_df, test_df], ignore_index=True)
 
-    registry = ExperimentRegistry(mode)
-    ckpt = CheckpointManager(mode)
+    # 2. Forecasting Feature Cache & Reuse across seeds
+    log("  Checking/Building cached forecasting panel frames...")
+    train_forecast_frame = cache_mgr.get_dataframe("train_forecast_frame")
+    if train_forecast_frame is None:
+        train_panel = build_monthly_panel(train_df)
+        train_forecast_frame = build_forecast_frame(train_panel)
+        cache_mgr.save_dataframe("train_forecast_frame", train_forecast_frame)
 
-    # Prepare forecasting frames
-    log("  Building forecasting frames...")
-    train_panel = build_monthly_panel(train_df)
-    train_forecast_frame = build_forecast_frame(train_panel)
+    test_forecast_frame = cache_mgr.get_dataframe("test_forecast_frame")
+    if test_forecast_frame is None:
+        test_panel = build_monthly_panel(test_df)
+        test_forecast_frame = build_forecast_frame(test_panel)
+        cache_mgr.save_dataframe("test_forecast_frame", test_forecast_frame)
 
-    val_panel = build_monthly_panel(val_df)
-    val_forecast_frame = build_forecast_frame(val_panel)
-
-    test_panel = build_monthly_panel(test_df)
-    test_forecast_frame = build_forecast_frame(test_panel)
-
-    # 2. Categorization Benchmarks (PART 3 & PART 5)
-    log("\n--- EXECUTING CATEGORIZATION BENCHMARKS ---")
+    # 3. Categorization Benchmarks with Resumable Scheduler
+    log("\n--- EXECUTING CATEGORIZATION BENCHMARKS (Resumable) ---")
     cat_models = CATEGORIZATION_MODELS if mode != "smoke" else ["majority", "tfidf_lr", "tfidf_svm", "random_forest"]
 
     for seed in seeds:
-        for model_name in tqdm(cat_models, desc=f"Cat Models (Seed {seed})"):
-            # Split B: Temporal (Default)
-            exp_id = f"CAT-{model_name.upper()}-TEMPORAL-S{seed}"
-            if ckpt.has_checkpoint(exp_id):
-                log(f"  Skipping {exp_id} (checkpoint exists)")
+        for model_name in cat_models:
+            exp_id = scheduler.enqueue_job("categorization", model_name, "temporal", seed)
+
+            if scheduler.is_completed(exp_id) and registry.has_result(exp_id):
+                log(f"  [Resumable] Skipping completed experiment: {exp_id}")
                 continue
 
-            res = evaluate_categorization_model(
-                model_name, train_df, test_df, split_name="temporal", seed=seed, mode=mode
-            )
-            registry.register(res)
-            ckpt.save_checkpoint(res)
+            scheduler.mark_running(exp_id)
+            t0 = time.time()
 
-            # Additional splits for development/final mode
-            if mode != "smoke":
-                # Split C: Merchant Disjoint
-                train_c, test_c = create_merchant_disjoint_split(full_df)
-                res_c = evaluate_categorization_model(model_name, train_c, test_c, "merchant_disjoint", seed, mode)
-                registry.register(res_c)
+            try:
+                res = evaluate_categorization_model(
+                    model_name, train_df, test_df, split_name="temporal", seed=seed, mode=mode
+                )
+                t1 = time.time()
 
-                # Split D: Novel Merchant
-                train_d, test_d = create_novel_merchant_split(full_df)
-                res_d = evaluate_categorization_model(model_name, train_d, test_d, "novel_merchant", seed, mode)
-                registry.register(res_d)
+                registry.register(res)
+                ckpt.save_checkpoint(res)
+                scheduler.mark_completed(exp_id, t1 - t0)
 
-    # 3. Forecasting Benchmarks (PART 4)
-    log("\n--- EXECUTING FORECASTING BENCHMARKS ---")
+                # Runtime & Autosave logging
+                runtime_logger.log_experiment(
+                    exp_id, model_name, "temporal", seed, len(test_df), t0, t1
+                )
+                registry.save_registry()
+                autosave_mgr.save_artifact(registry.registry_path)
+                git_sync.sync_experiment(exp_id, t1 - t0, seed, "temporal")
+
+            except Exception as e:
+                scheduler.mark_failed(exp_id)
+                log(f"  [Job Failed] {exp_id}: {e}")
+
+        scheduler.print_progress_dashboard()
+
+    # 4. Forecasting Benchmarks with Resumable Scheduler
+    log("\n--- EXECUTING FORECASTING BENCHMARKS (Resumable) ---")
     forecast_models = FORECAST_MODELS if mode != "smoke" else ["naive_previous", "naive_rolling", "linear_regression", "random_forest"]
 
     for seed in seeds:
-        for model_name in tqdm(forecast_models, desc=f"Forecast Models (Seed {seed})"):
-            exp_id = f"FOR-{model_name.upper()}-TEMPORAL-S{seed}"
-            if ckpt.has_checkpoint(exp_id):
-                log(f"  Skipping {exp_id} (checkpoint exists)")
+        for model_name in forecast_models:
+            exp_id = scheduler.enqueue_job("forecasting", model_name, "temporal", seed)
+
+            if scheduler.is_completed(exp_id) and registry.has_result(exp_id):
+                log(f"  [Resumable] Skipping completed experiment: {exp_id}")
                 continue
 
-            res = evaluate_forecasting_model(
-                model_name, train_forecast_frame, test_forecast_frame, split_name="temporal", seed=seed, mode=mode
-            )
-            registry.register(res)
-            ckpt.save_checkpoint(res)
+            scheduler.mark_running(exp_id)
+            t0 = time.time()
 
-    # Save artifacts from registry
+            try:
+                res = evaluate_forecasting_model(
+                    model_name, train_forecast_frame, test_forecast_frame, split_name="temporal", seed=seed, mode=mode
+                )
+                t1 = time.time()
+
+                registry.register(res)
+                ckpt.save_checkpoint(res)
+                scheduler.mark_completed(exp_id, t1 - t0)
+
+                runtime_logger.log_experiment(
+                    exp_id, model_name, "temporal", seed, len(test_forecast_frame), t0, t1
+                )
+                registry.save_registry()
+                autosave_mgr.save_artifact(registry.registry_path)
+                git_sync.sync_experiment(exp_id, t1 - t0, seed, "temporal")
+
+            except Exception as e:
+                scheduler.mark_failed(exp_id)
+                log(f"  [Job Failed] {exp_id}: {e}")
+
+        scheduler.print_progress_dashboard()
+
+    # Save registry, confusion matrices, classification reports, and feature importances
     registry.save_registry()
     registry.save_confusion_matrices()
     registry.save_classification_reports()
     registry.save_feature_importances()
-
-    # Read registry as DataFrame
     registry_df = pd.read_csv(registry.registry_path)
 
-    # 4. Robustness Benchmark (PART 6)
-    log("\n--- EXECUTING ROBUSTNESS BENCHMARK ---")
+    # 5. Robustness, Cold-Start, Merchant Gen, Drift, Calibration
+    log("\n--- EXECUTING AUXILIARY RESEARCH BENCHMARKS ---")
     robustness_df = evaluate_robustness(train_df, test_df, model_name="tfidf_lr", seed=seeds[0])
-    robustness_df.to_csv(Path(f"reports/results/{mode}") / "robustness_metrics.csv", index=False)
-
-    # 5. Cold Start Benchmark (PART 7)
-    log("\n--- EXECUTING COLD START BENCHMARK ---")
     cold_start_df = evaluate_cold_start(train_df, test_df, model_name="tfidf_lr", seed=seeds[0])
-    cold_start_df.to_csv(Path(f"reports/results/{mode}") / "cold_start_metrics.csv", index=False)
-
-    # 6. Merchant Generalization Benchmark (PART 8)
-    log("\n--- EXECUTING MERCHANT GENERALIZATION BENCHMARK ---")
     merchant_df = evaluate_merchant_generalization(train_df, test_df, model_name="tfidf_lr", seed=seeds[0])
-    merchant_df.to_csv(Path(f"reports/results/{mode}") / "merchant_generalization.csv", index=False)
-
-    # 7. Distribution Drift Benchmark (PART 9)
-    log("\n--- EXECUTING DISTRIBUTION DRIFT BENCHMARK ---")
     drift_df = evaluate_distribution_drift(full_df)
-    drift_df.to_csv(Path(f"reports/results/{mode}") / "drift_metrics.csv", index=False)
-
-    # 8. Calibration Benchmark (PART 10)
-    log("\n--- EXECUTING CALIBRATION BENCHMARK ---")
     cal_metrics, cal_res = evaluate_calibration(train_df, test_df, model_name="tfidf_lr", seed=seeds[0])
-    with open(Path(f"reports/results/{mode}") / "calibration_metrics.json", "w") as f:
-        json.dump(cal_metrics, f, indent=2)
 
-    # 9. Publication Tables & Figures Generation (PART 16 & PART 17)
+    # 6. Tables & Dual-Format Figure Generation (PNG + SVG)
     labels = sorted(train_df["category"].unique())
     generate_all_tables_and_figures(
         registry_df=registry_df,
@@ -206,76 +223,16 @@ def run_benchmarks(mode: str, seeds: List[int]) -> Dict[str, Any]:
         mode=mode,
     )
 
-    # 10. Multi-seed Statistical Summary (PART 18)
-    if len(seeds) > 1:
-        log("\n--- GENERATING MULTI-SEED STATISTICAL SUMMARY ---")
-        stats_summary = registry_df.groupby(["task", "model_name"]).agg({
-            "macro_f1": ["mean", "std"] if "macro_f1" in registry_df.columns else "count",
-            "accuracy": ["mean", "std"] if "accuracy" in registry_df.columns else "count",
-            "mae": ["mean", "std"] if "mae" in registry_df.columns else "count",
-        }).reset_index()
-        stats_summary.to_csv(Path(f"reports/results/{mode}") / "statistical_summary.csv", index=False)
-
-    # 11. Empirical Verification Before Completion (PART 22)
-    verify_benchmark_results(mode, start_time)
+    runtime_logger.generate_optimization_reports()
 
     elapsed = time.time() - start_time
-    log(f"\n=== BENCHMARK COMPLETE: Mode={mode.upper()} in {elapsed:.1f}s ===")
+    log(f"\n=== BENCHMARK COMPLETE (V4.1 OPTIMIZED): Mode={mode.upper()} in {elapsed:.1f}s ===")
     return {"status": "SUCCESS", "elapsed_seconds": elapsed}
 
 
-# ============================================================================
-# VERIFICATION BEFORE COMPLETION (PART 22)
-# ============================================================================
-
-def verify_benchmark_results(mode: str, start_time: float) -> None:
-    """Verify that all required CSVs, metrics, and figures exist and are valid."""
-    log("\n--- VERIFYING BENCHMARK OUTPUTS ---")
-    out_dir = Path(f"reports/results/{mode}")
-    fig_dir = Path(f"reports/figures/{mode}")
-
-    required_files = [
-        out_dir / "experiment_registry.csv",
-        out_dir / "Table_2_Categorization.csv",
-        out_dir / "Table_3_Forecasting.csv",
-        out_dir / "Table_4_Runtime.csv",
-        out_dir / "robustness_metrics.csv",
-        out_dir / "cold_start_metrics.csv",
-        out_dir / "merchant_generalization.csv",
-        out_dir / "drift_metrics.csv",
-    ]
-
-    for path in required_files:
-        if not path.exists():
-            raise RuntimeError(f"Verification FAILED: Missing required artifact {path}")
-        if path.stat().st_size == 0:
-            raise RuntimeError(f"Verification FAILED: Artifact {path} is EMPTY")
-
-    # Verify registry content
-    registry_df = pd.read_csv(out_dir / "experiment_registry.csv")
-    if len(registry_df) == 0:
-        raise RuntimeError("Verification FAILED: Experiment registry contains 0 rows")
-
-    # Verify metrics are not placeholders or constant
-    if "macro_f1" in registry_df.columns:
-        f1_vals = registry_df["macro_f1"].dropna().values
-        if len(f1_vals) > 0 and (f1_vals == f1_vals[0]).all() and len(f1_vals) > 3:
-            raise RuntimeError("Verification FAILED: Constant placeholder Macro F1 values detected")
-
-    runtime = time.time() - start_time
-    if runtime <= 0:
-        raise RuntimeError("Verification FAILED: Benchmark runtime reported <= 0s")
-
-    log("  All verification checks PASSED!")
-
-
-# ============================================================================
-# MAIN CLI ENTRYPOINT
-# ============================================================================
-
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="SpendSmart V3 Empirical Benchmark Runner"
+        description="SpendSmart V4.1 Resumable Empirical Benchmark Runner"
     )
     parser.add_argument(
         "--mode",

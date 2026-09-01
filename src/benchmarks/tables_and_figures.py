@@ -102,6 +102,7 @@ def generate_table_5_cold_start(
     if cold_start_df.empty:
         return pd.DataFrame()
     cold_start_df.to_csv(out_dir / "Table_5_Cold_Start.csv", index=False)
+    cold_start_df.to_csv(out_dir / "cold_start_metrics.csv", index=False)
     return cold_start_df
 
 
@@ -112,6 +113,7 @@ def generate_table_6_novel_merchant(
     if merchant_df.empty:
         return pd.DataFrame()
     merchant_df.to_csv(out_dir / "Table_6_Novel_Merchant.csv", index=False)
+    merchant_df.to_csv(out_dir / "merchant_generalization.csv", index=False)
     return merchant_df
 
 
@@ -122,6 +124,7 @@ def generate_table_7_robustness(
     if robustness_df.empty:
         return pd.DataFrame()
     robustness_df.to_csv(out_dir / "Table_7_Robustness.csv", index=False)
+    robustness_df.to_csv(out_dir / "robustness_metrics.csv", index=False)
     return robustness_df
 
 

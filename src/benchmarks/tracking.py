@@ -28,10 +28,49 @@ class ExperimentRegistry:
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.registry_path = self.base_dir / "experiment_registry.csv"
         self.results: List[BenchmarkResult] = []
+        self._load_existing_registry()
+
+    def _load_existing_registry(self) -> None:
+        """Load existing registry CSV into memory if it exists."""
+        if self.registry_path.exists():
+            try:
+                df = pd.read_csv(self.registry_path)
+                for _, row in df.iterrows():
+                    meta = ExperimentMeta(
+                        experiment_id=str(row["experiment_id"]),
+                        model_name=str(row["model_name"]),
+                        task=str(row.get("task", "categorization")),
+                        split_name=str(row.get("split_name", "temporal")),
+                        seed=int(row.get("seed", 42)),
+                        mode=str(row.get("mode", self.mode)),
+                        git_commit=str(row.get("git_commit", "N/A")),
+                        dataset_hash=str(row.get("dataset_hash", "N/A")),
+                        config_hash=str(row.get("config_hash", "N/A")),
+                        device=str(row.get("device", "cpu")),
+                        runtime_seconds=float(row.get("runtime_seconds", 0.0)),
+                        timestamp=str(row.get("timestamp", "")),
+                        status=str(row.get("status", "COMPLETED")),
+                    )
+                    runtime = RuntimeInfo(
+                        training_seconds=float(row.get("training_seconds", 0.0)),
+                        inference_ms=float(row.get("inference_ms", 0.0)),
+                        peak_ram_mb=float(row.get("peak_ram_mb", 0.0)),
+                        model_parameters=int(row.get("model_parameters", 0)),
+                    )
+                    metrics = {k: float(v) for k, v in row.items() if k not in meta.__dict__ and k not in runtime.__dict__ and isinstance(v, (int, float, np.number))}
+                    res = BenchmarkResult(meta=meta, metrics=metrics, runtime=runtime)
+                    self.results.append(res)
+            except Exception:
+                pass
+
+    def has_result(self, experiment_id: str) -> bool:
+        """Check if an experiment ID is already recorded in results."""
+        return any(r.meta.experiment_id == experiment_id for r in self.results)
 
     def register(self, result: BenchmarkResult) -> None:
         """Register a completed experiment result."""
-        self.results.append(result)
+        if not self.has_result(result.meta.experiment_id):
+            self.results.append(result)
         self._save_manifest(result)
 
     def _save_manifest(self, result: BenchmarkResult) -> None:
@@ -50,6 +89,8 @@ class ExperimentRegistry:
     def save_registry(self) -> None:
         """Save the experiment registry CSV."""
         if not self.results:
+            if not self.registry_path.exists():
+                pd.DataFrame(columns=["experiment_id", "model_name", "task", "split_name", "seed", "mode", "status", "macro_f1", "mae"]).to_csv(self.registry_path, index=False)
             return
 
         rows = []

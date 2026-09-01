@@ -116,10 +116,12 @@ class StatisticalValidator:
             })
 
         summary_df = pd.DataFrame(summary_records)
+        if summary_df.empty:
+            summary_df = pd.DataFrame(columns=["task", "model_name", "metric_name", "sample_seeds", "mean", "std", "ci_95_lower", "ci_95_upper"])
 
         # Paired Significance Tests vs Baseline (e.g. TF-IDF vs Majority, or XGB vs Linear)
         sig_records = []
-        cat_models = summary_df[summary_df["task"] == "categorization"]["model_name"].unique()
+        cat_models = summary_df["model_name"].unique() if "task" in summary_df.columns else []
         if "tfidf_lr" in cat_models and "majority" in cat_models:
             scores_lr = registry_df[registry_df["model_name"] == "tfidf_lr"]["macro_f1"].values
             scores_maj = registry_df[registry_df["model_name"] == "majority"]["macro_f1"].values
