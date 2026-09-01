@@ -23,7 +23,12 @@ def build_monthly_panel(df: pd.DataFrame) -> pd.DataFrame:
     Months with no activity for a user are filled in (zeros) so lags are well-defined.
     """
     d = df.copy()
-    d["month"] = d["date"].dt.to_period("M").dt.to_timestamp()
+    if "date" not in d.columns and "timestamp" in d.columns:
+        d["date"] = d["timestamp"]
+    d["month"] = pd.to_datetime(d["date"]).dt.to_period("M").dt.to_timestamp()
+
+    if "type" not in d.columns and "direction" in d.columns:
+        d["type"] = d["direction"].map({"debit": "expense", "credit": "income"}).fillna("expense")
 
     exp = d[d["type"] == "expense"]
     wide = (exp.groupby(["user_id", "month", "category"])["amount"].sum()
@@ -125,8 +130,11 @@ def build_forecast_frame(panel: pd.DataFrame, static_features: pd.DataFrame | No
 
     long = long.rename(columns={"income": "cur_income"})
     lag_cols = [f"lag_{l}" for l in range(1, lags + 1)]
-    long = long.dropna(subset=lag_cols)
+    for lc in lag_cols:
+        long[lc] = long[lc].fillna(0.0)
     long["roll_std_3"] = long["roll_std_3"].fillna(0.0)
+    long["roll_mean_3"] = long["roll_mean_3"].fillna(0.0)
+    long["tot_lag_1"] = long["tot_lag_1"].fillna(0.0)
 
     keep = (["user_id", "month", "category", "target", "cur_income"] + lag_cols
             + ["roll_mean_3", "roll_std_3", "tot_lag_1", "moy_sin", "moy_cos"])
