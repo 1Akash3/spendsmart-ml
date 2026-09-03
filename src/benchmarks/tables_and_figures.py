@@ -340,6 +340,7 @@ def generate_all_tables_and_figures(
     labels: list,
     fi_dict: Optional[dict],
     mode: str,
+    drift_df: Optional[pd.DataFrame] = None,
 ) -> None:
     """Generate Tables 2-8 and Figures 5-13."""
     log("  Generating publication Tables 2-8 and Figures 5-13...")
@@ -361,6 +362,9 @@ def generate_all_tables_and_figures(
     generate_table_6_novel_merchant(merchant_df, out_dir)
     generate_table_7_robustness(robustness_df, out_dir)
     generate_table_8_calibration(cal_metrics, out_dir)
+
+    if drift_df is not None and not drift_df.empty:
+        drift_df.to_csv(out_dir / "drift_metrics.csv", index=False)
 
     # Figures
     generate_figure_5_macro_f1(registry_df, fig_dir)

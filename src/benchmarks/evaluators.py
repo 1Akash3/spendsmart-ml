@@ -350,57 +350,13 @@ def evaluate_merchant_generalization(
 
 def evaluate_distribution_drift(
     df: pd.DataFrame,
+    mode: str = "smoke",
 ) -> pd.DataFrame:
     """Compute temporal drift metrics: Population Stability Index (PSI), Wasserstein Distance, KL Divergence."""
-    log("  Running Distribution Drift Benchmark...")
-
-    df_sorted = df.sort_values("timestamp").reset_index(drop=True)
-    df_sorted["year_month"] = pd.to_datetime(df_sorted["timestamp"]).dt.to_period("M")
-
-    months = sorted(df_sorted["year_month"].unique())
-    if len(months) < 2:
-        # Dummy output if only 1 month
-        return pd.DataFrame([{
-            "period": "M1-vs-M2",
-            "psi": 0.01,
-            "wasserstein_distance": 0.005,
-            "kl_divergence": 0.002,
-        }])
-
-    results = []
-    base_month = months[0]
-    base_amounts = df_sorted[df_sorted["year_month"] == base_month]["amount"].values
-
-    for m in months[1:]:
-        curr_amounts = df_sorted[df_sorted["year_month"] == m]["amount"].values
-        if len(curr_amounts) < 5 or len(base_amounts) < 5:
-            continue
-
-        # Wasserstein Distance
-        wd = float(wasserstein_distance(base_amounts, curr_amounts))
-
-        # Histograms for PSI and KL
-        bins = np.histogram_bin_edges(np.concatenate([base_amounts, curr_amounts]), bins=10)
-        p, _ = np.histogram(base_amounts, bins=bins, density=True)
-        q, _ = np.histogram(curr_amounts, bins=bins, density=True)
-
-        p = np.where(p == 0, 1e-6, p)
-        q = np.where(q == 0, 1e-6, q)
-
-        # PSI
-        psi = float(np.sum((p - q) * np.log(p / q)))
-
-        # KL Divergence
-        kl = float(entropy(p, q))
-
-        results.append({
-            "period": f"{base_month}-vs-{m}",
-            "psi": round(psi, 4),
-            "wasserstein_distance": round(wd, 4),
-            "kl_divergence": round(kl, 4),
-        })
-
-    return pd.DataFrame(results)
+    from src.drift import DriftEngine
+    engine = DriftEngine(mode=mode)
+    drift_df, _ = engine.run_drift_analysis(df)
+    return drift_df
 
 
 # ============================================================================

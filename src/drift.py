@@ -1,10 +1,10 @@
-"""Distribution Drift Research & Monitoring Engine for SpendSmart V4.
+"""Distribution Drift Research & Monitoring Engine for SpendSmart V4.1.
 
 Computes multi-dimensional temporal drift:
 1. Population Stability Index (PSI) on amount distributions.
 2. Wasserstein Distance on financial feature vectors.
 3. KL Divergence on category and merchant prior probabilities.
-4. Generates a comprehensive drift dashboard.
+4. Generates a comprehensive drift dashboard and drift_metrics.csv.
 """
 from __future__ import annotations
 
@@ -31,9 +31,9 @@ from src.benchmarks import log
 def compute_psi(reference: np.ndarray, current: np.ndarray, num_bins: int = 10) -> float:
     """Compute Population Stability Index (PSI) between reference and current samples.
 
-    PSI < 0.1: No significant shift
-    0.1 <= PSI < 0.25: Moderate shift
-    PSI >= 0.25: Significant population drift
+    PSI < 0.1: STABLE (No significant shift)
+    0.1 <= PSI < 0.25: MODERATE (Moderate shift)
+    PSI >= 0.25: DRIFT_ALERT (Significant population drift)
     """
     if len(reference) == 0 or len(current) == 0:
         return 0.0
@@ -74,6 +74,15 @@ def compute_category_kl_divergence(
     return float(np.round(entropy(ref_p, curr_q), 4))
 
 
+def get_drift_status(psi_val: float) -> str:
+    """Classify drift severity based on Population Stability Index."""
+    if psi_val >= 0.25:
+        return "DRIFT_ALERT"
+    elif psi_val >= 0.10:
+        return "MODERATE"
+    return "STABLE"
+
+
 class DriftEngine:
     """Orchestrates comprehensive distribution drift benchmarks."""
 
@@ -81,71 +90,104 @@ class DriftEngine:
         self.mode = mode
 
     def run_drift_analysis(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-        """Run monthly temporal drift analysis across amount, category, and merchant features."""
+        """Run temporal drift analysis across amount and category distributions."""
         log("  Executing Temporal Distribution Drift Analysis...")
 
         df_sorted = df.copy()
-        df_sorted["timestamp"] = pd.to_datetime(df_sorted["timestamp"], utc=True)
-        df_sorted["period"] = df_sorted["timestamp"].dt.to_period("M").astype(str)
+        if "timestamp" in df_sorted.columns:
+            df_sorted["timestamp"] = pd.to_datetime(df_sorted["timestamp"], utc=True)
+            df_sorted = df_sorted.sort_values("timestamp").reset_index(drop=True)
+            df_sorted["period"] = df_sorted["timestamp"].dt.to_period("M").astype(str)
+        else:
+            df_sorted["period"] = "M1"
 
         periods = sorted(df_sorted["period"].unique())
-        all_cats = sorted(df_sorted["category"].unique())
-
-        if len(periods) < 2:
-            log("  Single period dataset. Returning baseline drift report.")
-            df_drift = pd.DataFrame([{
-                "period_comparison": "P1_vs_P1",
-                "amount_psi": 0.0,
-                "amount_wasserstein": 0.0,
-                "category_kl_div": 0.0,
-                "drift_alert": False,
-            }])
-            dashboard = {"status": "STABLE", "total_periods": 1, "max_psi": 0.0}
-            return df_drift, dashboard
-
-        ref_period = periods[0]
-        ref_df = df_sorted[df_sorted["period"] == ref_period]
-        ref_amounts = ref_df["amount"].values
+        all_cats = sorted(df_sorted["category"].unique()) if "category" in df_sorted.columns else ["default"]
 
         drift_records = []
         max_psi = 0.0
 
-        for curr_period in periods[1:]:
-            curr_df = df_sorted[df_sorted["period"] == curr_period]
-            curr_amounts = curr_df["amount"].values
+        if len(periods) < 2:
+            # Single period available (e.g. smoke dataset)
+            # Split chronologically into two halves to compute real metrics on real data
+            half_idx = len(df_sorted) // 2
+            ref_df = df_sorted.iloc[:max(1, half_idx)]
+            curr_df = df_sorted.iloc[max(1, half_idx):] if half_idx > 0 else ref_df
+
+            p_label = f"{periods[0]}_H1-vs-{periods[0]}_H2" if periods else "P1-vs-P2"
+            ref_amounts = ref_df["amount"].values if "amount" in ref_df.columns else np.array([1.0])
+            curr_amounts = curr_df["amount"].values if "amount" in curr_df.columns else np.array([1.0])
 
             psi = compute_psi(ref_amounts, curr_amounts)
-            wd = float(wasserstein_distance(ref_amounts, curr_amounts))
-            kl_div = compute_category_kl_divergence(
-                ref_df["category"], curr_df["category"], all_cats
-            )
+            wd = float(np.round(wasserstein_distance(ref_amounts, curr_amounts), 4))
+            
+            ref_cats = ref_df["category"] if "category" in ref_df.columns else pd.Series(["default"])
+            curr_cats = curr_df["category"] if "category" in curr_df.columns else pd.Series(["default"])
+            kl_div = compute_category_kl_divergence(ref_cats, curr_cats, all_cats)
 
-            drift_alert = psi >= 0.25
-            max_psi = max(max_psi, psi)
+            status = get_drift_status(psi)
+            max_psi = psi
 
             drift_records.append({
-                "reference_period": ref_period,
-                "current_period": curr_period,
+                "period": p_label,
+                "psi": psi,
+                "wasserstein_distance": wd,
+                "kl_divergence": kl_div,
+                "status": status,
+                "drift_alert": psi >= 0.25,
+                "reference_period": f"{periods[0]}_H1" if periods else "P1",
+                "current_period": f"{periods[0]}_H2" if periods else "P2",
                 "amount_psi": psi,
-                "amount_wasserstein": round(wd, 4),
+                "amount_wasserstein": wd,
                 "category_kl_divergence": kl_div,
-                "drift_alert": drift_alert,
             })
+        else:
+            ref_period = periods[0]
+            ref_df = df_sorted[df_sorted["period"] == ref_period]
+            ref_amounts = ref_df["amount"].values if "amount" in ref_df.columns else np.array([1.0])
+            ref_cats = ref_df["category"] if "category" in ref_df.columns else pd.Series(["default"])
+
+            for curr_period in periods[1:]:
+                curr_df = df_sorted[df_sorted["period"] == curr_period]
+                curr_amounts = curr_df["amount"].values if "amount" in curr_df.columns else np.array([1.0])
+                curr_cats = curr_df["category"] if "category" in curr_df.columns else pd.Series(["default"])
+
+                psi = compute_psi(ref_amounts, curr_amounts)
+                wd = float(np.round(wasserstein_distance(ref_amounts, curr_amounts), 4))
+                kl_div = compute_category_kl_divergence(ref_cats, curr_cats, all_cats)
+
+                status = get_drift_status(psi)
+                max_psi = max(max_psi, psi)
+
+                drift_records.append({
+                    "period": f"{ref_period}-vs-{curr_period}",
+                    "psi": psi,
+                    "wasserstein_distance": wd,
+                    "kl_divergence": kl_div,
+                    "status": status,
+                    "drift_alert": psi >= 0.25,
+                    "reference_period": ref_period,
+                    "current_period": curr_period,
+                    "amount_psi": psi,
+                    "amount_wasserstein": wd,
+                    "category_kl_divergence": kl_div,
+                })
 
         drift_df = pd.DataFrame(drift_records)
 
         dashboard = {
-            "status": "DRIFT_DETECTED" if max_psi >= 0.25 else "STABLE",
-            "reference_period": ref_period,
-            "monitored_periods": len(periods) - 1,
+            "status": get_drift_status(max_psi),
+            "monitored_periods": len(drift_records),
             "max_psi": round(max_psi, 4),
             "drift_alerts_count": int(drift_df["drift_alert"].sum()),
         }
 
+        # Write drift_metrics.csv to mode output directory
         out_dir = Path(f"reports/results/{self.mode}")
+        out_dir.mkdir(parents=True, exist_ok=True)
         drift_df.to_csv(out_dir / "drift_metrics.csv", index=False)
         with open(out_dir / "drift_dashboard.json", "w") as f:
             json.dump(dashboard, f, indent=2)
 
-        log(f"  Drift analysis complete. Max PSI: {max_psi:.4f} (Status: {dashboard['status']})")
+        log(f"  Drift analysis complete. Saved {len(drift_df)} record(s) to {out_dir / 'drift_metrics.csv'} (Max PSI: {max_psi:.4f}, Status: {dashboard['status']})")
         return drift_df, dashboard

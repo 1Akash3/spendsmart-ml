@@ -125,6 +125,32 @@ class TestBaselineRunner:
             assert path.exists(), f"Missing benchmark CSV: {c}"
             assert path.stat().st_size > 0, f"Empty benchmark CSV: {c}"
 
+    def test_drift_metrics_schema_and_contents(self, benchmark_results):
+        """drift_metrics.csv must contain real computed metrics and required canonical columns."""
+        out_dir, _, _ = benchmark_results
+        path = out_dir / "drift_metrics.csv"
+        assert path.exists(), "Missing drift_metrics.csv!"
+        assert path.stat().st_size > 0, "drift_metrics.csv is empty!"
+
+        df = pd.read_csv(path)
+        required_cols = ["period", "psi", "wasserstein_distance", "kl_divergence", "status"]
+        for col in required_cols:
+            assert col in df.columns, f"Missing required column '{col}' in drift_metrics.csv"
+
+        assert len(df) > 0, "drift_metrics.csv has 0 rows"
+        assert not df["period"].isnull().any(), "period column contains null values"
+        assert (df["psi"] >= 0.0).all(), "psi values must be non-negative"
+        assert (df["wasserstein_distance"] >= 0.0).all(), "wasserstein_distance values must be non-negative"
+        assert (df["kl_divergence"] >= 0.0).all(), "kl_divergence values must be non-negative"
+        assert df["status"].isin(["STABLE", "MODERATE", "DRIFT_ALERT"]).all(), f"Invalid status in drift_metrics.csv: {df['status'].unique()}"
+
+    def test_drift_experiment_registered(self, benchmark_results):
+        """Drift experiment must be recorded in experiment_registry.csv."""
+        out_dir, _, _ = benchmark_results
+        df = pd.read_csv(out_dir / "experiment_registry.csv")
+        drift_rows = df[df["task"] == "drift"]
+        assert len(drift_rows) > 0, "No drift experiment found in experiment_registry.csv"
+
     def test_confusion_matrices_saved(self, benchmark_results):
         """Confusion matrices directory must contain CSV files."""
         out_dir, _, _ = benchmark_results

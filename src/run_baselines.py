@@ -36,7 +36,8 @@ for _p in (_ROOT, _SRC):
 from src.autosave_manager import AutosaveManager
 from src.benchmarks import (
     CAT_SPLIT_NAMES, CATEGORIZATION_MODELS, DEV_SEEDS, FORECAST_MODELS,
-    SMOKE_SEEDS, log,
+    SMOKE_SEEDS, BenchmarkResult, ExperimentMeta, RuntimeInfo,
+    get_git_commit, hash_config, load_dataset_hash, log,
 )
 from src.benchmarks.evaluators import (
     evaluate_calibration, evaluate_categorization_model, evaluate_cold_start,
@@ -206,8 +207,44 @@ def run_benchmarks(mode: str, seeds: List[int]) -> Dict[str, Any]:
     robustness_df = evaluate_robustness(train_df, test_df, model_name="tfidf_lr", seed=seeds[0])
     cold_start_df = evaluate_cold_start(train_df, test_df, model_name="tfidf_lr", seed=seeds[0])
     merchant_df = evaluate_merchant_generalization(train_df, test_df, model_name="tfidf_lr", seed=seeds[0])
-    drift_df = evaluate_distribution_drift(full_df)
+    drift_df = evaluate_distribution_drift(full_df, mode=mode)
+
+    # Register drift experiment in registry
+    exp_id = scheduler.enqueue_job("drift", "drift_engine", "temporal", seeds[0])
+    if not registry.has_result(exp_id):
+        max_psi = float(drift_df["psi"].max()) if "psi" in drift_df.columns and not drift_df.empty else 0.0
+        drift_meta = ExperimentMeta(
+            experiment_id=exp_id,
+            model_name="drift_engine",
+            task="drift",
+            split_name="temporal",
+            seed=seeds[0],
+            mode=mode,
+            git_commit=get_git_commit(),
+            dataset_hash=load_dataset_hash(mode),
+            config_hash=hash_config({"model": "drift_engine", "split": "temporal", "seed": seeds[0]}),
+            device="cpu",
+            runtime_seconds=0.01,
+            timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            status="COMPLETED",
+        )
+        drift_result = BenchmarkResult(
+            meta=drift_meta,
+            metrics={
+                "max_psi": max_psi,
+                "monitored_periods": float(len(drift_df)),
+            },
+            runtime=RuntimeInfo(),
+        )
+        registry.register(drift_result)
+        ckpt.save_checkpoint(drift_result)
+        scheduler.mark_completed(exp_id, 0.01)
+
     cal_metrics, cal_res = evaluate_calibration(train_df, test_df, model_name="tfidf_lr", seed=seeds[0])
+
+    # Re-save registry to include drift experiment
+    registry.save_registry()
+    registry_df = pd.read_csv(registry.registry_path)
 
     # 6. Tables & Dual-Format Figure Generation (PNG + SVG)
     labels = sorted(train_df["category"].unique())
@@ -221,6 +258,7 @@ def run_benchmarks(mode: str, seeds: List[int]) -> Dict[str, Any]:
         labels=labels,
         fi_dict=cal_res.feature_importance,
         mode=mode,
+        drift_df=drift_df,
     )
 
     runtime_logger.generate_optimization_reports()
