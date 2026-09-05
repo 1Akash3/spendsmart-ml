@@ -1,5 +1,17 @@
 # SpendSmart V4 CHANGELOG
 
+## [4.1.1] - SpendSmart V4.1.1 Research Patch
+
+### Fixed
+- Fixed missing `drift_metrics.csv` and `drift_dashboard.json` generation logic.
+- Corrected PATFormer learning rate scheduler step order in `neural_engine.py` (resolves PyTorch warning).
+- Improved Logistic Regression training stability (`max_iter=1000`, `n_jobs=-1`) and removed deprecated `multi_class` argument.
+- Silenced Seaborn `palette` deprecation warnings by explicitly setting `hue`.
+- Resolved pandas timezone conversion warnings (`dt.tz_localize(None)`) prior to monthly aggregation.
+- Implemented Research Gate 6 verification in `run_baselines.py` to assert creation of all empirical benchmark artifacts.
+- Added explicit `benchmark_metadata.json` provenance tracking.
+- Improved Google Colab compatibility for CLI execution.
+
 ## [4.0.0] - 2026-09-01
 
 ### Added

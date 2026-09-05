@@ -24,7 +24,7 @@ def _build_pipeline() -> Pipeline:
     return Pipeline([
         ("tfidf", FeatureUnion([("word", word), ("char", char)])),
         ("clf", LogisticRegression(max_iter=1000, C=4.0,
-                                   class_weight="balanced", random_state=RANDOM_SEED)),
+                                   class_weight="balanced", random_state=RANDOM_SEED, n_jobs=1)),
     ])
 
 
@@ -84,7 +84,7 @@ class HybridTransactionCategorizer:
         ])
         self.transformer_name = transformer_name
         self.transformer = SentenceTransformer(transformer_name)
-        self.clf = LogisticRegression(max_iter=1000, C=4.0, class_weight="balanced", random_state=RANDOM_SEED)
+        self.clf = LogisticRegression(max_iter=1000, C=4.0, class_weight="balanced", random_state=RANDOM_SEED, n_jobs=1)
         self.classes_: np.ndarray | None = None
 
     def _embed(self, texts):

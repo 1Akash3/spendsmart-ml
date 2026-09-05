@@ -182,7 +182,7 @@ def generate_figure_6_forecast_mae(registry_df: pd.DataFrame, fig_dir: Path) -> 
         return
 
     plt.figure(figsize=(8, 5))
-    ax = sns.barplot(data=for_df, x="model_name", y="mae", palette="Blues_d")
+    ax = sns.barplot(data=for_df, x="model_name", y="mae", hue="model_name", legend=False, palette="Blues_d")
     plt.title("Forecasting Performance: MAE Comparison")
     plt.xlabel("Forecasting Model")
     plt.ylabel("Mean Absolute Error (INR)")
@@ -226,7 +226,7 @@ def generate_figure_8_feature_importance(fi_dict: dict, fig_dir: Path) -> None:
     fi_df = fi_df.sort_values("importance", ascending=False).head(15)
 
     plt.figure(figsize=(8, 5))
-    sns.barplot(data=fi_df, x="importance", y="feature", palette="viridis")
+    sns.barplot(data=fi_df, x="importance", y="feature", hue="feature", legend=False, palette="viridis")
     plt.title("Top Feature Importances")
     plt.xlabel("Importance Score")
     plt.ylabel("Feature")
@@ -279,7 +279,7 @@ def generate_figure_11_novel_merchant(merch_df: pd.DataFrame, fig_dir: Path) -> 
         return
 
     plt.figure(figsize=(7, 5))
-    sns.barplot(data=merch_df, x="merchant_tier", y="macro_f1", palette="magma")
+    sns.barplot(data=merch_df, x="merchant_tier", y="macro_f1", hue="merchant_tier", legend=False, palette="magma")
     plt.title("Merchant Generalization across Frequency Tiers")
     plt.xlabel("Merchant Tier")
     plt.ylabel("Macro F1 Score")

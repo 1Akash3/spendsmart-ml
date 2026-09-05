@@ -290,7 +290,7 @@ def _generate_figure_2_from_data(mode: str, fig_dir: Path) -> None:
 
     cat_counts = df["category"].value_counts()
     plt.figure(figsize=(7, 4))
-    sns.barplot(x=cat_counts.values, y=cat_counts.index, palette="mako")
+    sns.barplot(x=cat_counts.values, y=cat_counts.index, hue=cat_counts.index, legend=False, palette="mako")
     plt.title(f"Figure 2: Dataset Category Distribution ({mode}, N={len(df):,})")
     plt.xlabel("Transaction Count")
     plt.tight_layout()
@@ -364,7 +364,7 @@ def _generate_figure_14_from_data(mode: str, fig_dir: Path) -> None:
     labels = [c.replace("_", " ").title() for c in mean_scores.index]
 
     plt.figure(figsize=(7, 4))
-    sns.barplot(x=labels, y=mean_scores.values, palette="viridis")
+    sns.barplot(x=labels, y=mean_scores.values, hue=labels, legend=False, palette="viridis")
     plt.title(f"Figure 14: Mean Health Score Components ({mode}, N={len(hdf)})")
     plt.ylabel("Mean Score Contribution")
     plt.tight_layout()
@@ -385,7 +385,7 @@ def _generate_figure_15_from_data(mode: str, fig_dir: Path) -> None:
         return
 
     df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
-    df["month"] = df["timestamp"].dt.to_period("M")
+    df["month"] = df["timestamp"].dt.tz_localize(None).dt.to_period("M")
 
     # Compute mean monthly spend and a 15% reduction target
     monthly = df.groupby(["user_id", "month"])["amount"].sum().reset_index()
@@ -481,7 +481,7 @@ def _generate_figure_17_from_data(mode: str, fig_dir: Path) -> None:
     model_times = rt_df.groupby("model_name")["elapsed_seconds"].mean().sort_values(ascending=False)
 
     plt.figure(figsize=(7, 4))
-    sns.barplot(x=model_times.values, y=model_times.index, palette="coolwarm")
+    sns.barplot(x=model_times.values, y=model_times.index, hue=model_times.index, legend=False, palette="coolwarm")
     plt.title(f"Figure 17: Model Runtime Comparison ({mode})")
     plt.xlabel("Mean Runtime (seconds)")
     plt.tight_layout()

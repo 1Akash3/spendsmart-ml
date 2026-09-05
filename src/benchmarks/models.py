@@ -131,7 +131,7 @@ def train_tfidf_lr(
     X = tfidf.fit_transform(train_df[desc_col].fillna("").astype(str))
     model = LogisticRegression(
         max_iter=1000, C=4.0, class_weight="balanced",
-        random_state=seed, solver="lbfgs", multi_class="multinomial",
+        random_state=seed, solver="lbfgs", n_jobs=1,
     )
     model.fit(X, y_train)
     return model, tfidf, desc_col
@@ -191,7 +191,7 @@ def train_random_forest_cat(
     X_train, _, num_cols = build_combined_features(train_df, train_df)
     model = RandomForestClassifier(
         n_estimators=n_estimators, max_depth=12, min_samples_leaf=5,
-        class_weight="balanced", random_state=seed, n_jobs=-1,
+        class_weight="balanced", random_state=seed, n_jobs=1,
     )
     model.fit(X_train, y_train)
     return model, num_cols, train_df
@@ -444,7 +444,7 @@ def train_rf_regressor(train_df: pd.DataFrame, seed=42, n_estimators=100, **kw):
     y = train_df["target"].values
     model = RandomForestRegressor(
         n_estimators=n_estimators, max_depth=8,
-        random_state=seed, n_jobs=-1,
+        random_state=seed, n_jobs=1,
     )
     model.fit(X, y)
     importances = dict(zip(feat_cols, model.feature_importances_))

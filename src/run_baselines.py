@@ -263,6 +263,38 @@ def run_benchmarks(mode: str, seeds: List[int]) -> Dict[str, Any]:
 
     runtime_logger.generate_optimization_reports()
 
+    # 7. Experiment Provenance
+    import platform
+    import torch
+    out_dir = Path(f"reports/results/{mode}")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    metadata = {
+        "experiment_id": f"benchmark_{mode}_{int(time.time())}",
+        "git_commit": get_git_commit(),
+        "dataset_hash": load_dataset_hash(mode),
+        "seed": seeds[0],
+        "mode": mode,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "hardware": platform.processor(),
+        "python_version": sys.version,
+        "pytorch_version": torch.__version__,
+    }
+    with open(out_dir / "benchmark_metadata.json", "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    # 8. Verify Baseline Outputs
+    required_artifacts = [
+        "Table_2_Categorization.csv",
+        "Table_3_Forecasting.csv",
+        "robustness_metrics.csv",
+        "cold_start_metrics.csv",
+        "merchant_generalization.csv",
+        "drift_metrics.csv"
+    ]
+    for artifact in required_artifacts:
+        if not (out_dir / artifact).exists():
+            raise RuntimeError(f"Research Gate 6 failed: Missing benchmark artifact. Expected {artifact}")
+
     elapsed = time.time() - start_time
     log(f"\n=== BENCHMARK COMPLETE (V4.1 OPTIMIZED): Mode={mode.upper()} in {elapsed:.1f}s ===")
     return {"status": "SUCCESS", "elapsed_seconds": elapsed}

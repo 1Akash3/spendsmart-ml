@@ -25,7 +25,7 @@ def build_monthly_panel(df: pd.DataFrame) -> pd.DataFrame:
     d = df.copy()
     if "date" not in d.columns and "timestamp" in d.columns:
         d["date"] = d["timestamp"]
-    d["month"] = pd.to_datetime(d["date"]).dt.to_period("M").dt.to_timestamp()
+    d["month"] = pd.to_datetime(d["date"], utc=True).dt.tz_localize(None).dt.to_period("M").dt.to_timestamp()
 
     if "type" not in d.columns and "direction" in d.columns:
         d["type"] = d["direction"].map({"debit": "expense", "credit": "income"}).fillna("expense")

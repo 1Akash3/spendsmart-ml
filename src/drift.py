@@ -95,7 +95,7 @@ class DriftEngine:
 
         df_sorted = df.copy()
         if "timestamp" in df_sorted.columns:
-            df_sorted["timestamp"] = pd.to_datetime(df_sorted["timestamp"], utc=True)
+            df_sorted["timestamp"] = pd.to_datetime(df_sorted["timestamp"], utc=True).dt.tz_localize(None)
             df_sorted = df_sorted.sort_values("timestamp").reset_index(drop=True)
             df_sorted["period"] = df_sorted["timestamp"].dt.to_period("M").astype(str)
         else:

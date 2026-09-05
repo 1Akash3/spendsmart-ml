@@ -111,8 +111,6 @@ class PATFormerTrainer:
             cat_seq, amt_seq, y_cat, y_amt = [b.to(self.device) for b in batch]
             amt_seq = amt_seq.unsqueeze(-1)
 
-            self.optimizer.zero_grad()
-
             with torch.amp.autocast("cuda", enabled=torch.cuda.is_available()):
                 outputs = self.model(cat_seq, amt_seq)
                 pred_cat = outputs["category"]
@@ -127,6 +125,8 @@ class PATFormerTrainer:
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.grad_clip)
             self.scaler.step(self.optimizer)
             self.scaler.update()
+            self.scheduler.step()
+            self.optimizer.zero_grad(set_to_none=True)
 
             total_loss += loss.item()
             total_cat_loss += loss_cat.item()
@@ -201,7 +201,6 @@ class PATFormerTrainer:
                 for epoch in range(1, self.config.epochs + 1):
                     train_metrics = self.train_epoch(train_loader)
                     val_metrics = self.evaluate(val_loader)
-                    self.scheduler.step()
 
                     rec = {
                         "epoch": epoch,

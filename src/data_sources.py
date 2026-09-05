@@ -286,7 +286,7 @@ def load_indian_bank_transactions(sample_users: Optional[int] = None,
     out["description"] = out["merchant_category"].astype(str)
 
     # keep users with enough monthly history for lag features / forecasting
-    months = out.assign(_m=out["date"].dt.to_period("M")).groupby("user_id")["_m"].nunique()
+    months = out.assign(_m=out["date"].dt.tz_localize(None).dt.to_period("M")).groupby("user_id")["_m"].nunique()
     keep = months[months >= min_months].index
     out = out[out["user_id"].isin(keep)]
     if sample_users:

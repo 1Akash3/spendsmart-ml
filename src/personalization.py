@@ -63,7 +63,7 @@ class AdaptivePersonalizationEngine:
 
         # 1. Global Model
         X_train, X_test, tfidf = build_text_features(train_df[desc_col], test_df[desc_col])
-        global_model = LogisticRegression(max_iter=500, C=2.0, random_state=self.seed)
+        global_model = LogisticRegression(max_iter=1000, C=2.0, random_state=self.seed, n_jobs=1)
         global_model.fit(X_train, train_df["category"].values)
         global_probs = global_model.predict_proba(X_test)
         classes = global_model.classes_
@@ -117,7 +117,7 @@ class AdaptivePersonalizationEngine:
                     u_X_tr, u_X_te, u_tfidf = build_text_features(
                         user_train[desc_col], pd.Series([getattr(row, desc_col)])
                     )
-                    u_model = LogisticRegression(max_iter=200, C=1.0, random_state=self.seed)
+                    u_model = LogisticRegression(max_iter=1000, C=1.0, random_state=self.seed, n_jobs=1)
                     u_model.fit(u_X_tr, user_train["category"].values)
                     p_cat = u_model.predict(u_X_te)[0]
                     pred_personal.append(p_cat)

@@ -55,7 +55,7 @@ class AblationEngine:
 
         # Full System (Baseline for Subtractive)
         X_tr_full, X_te_full, _ = build_combined_features(train_df, test_df)
-        model_full = LogisticRegression(max_iter=500, C=2.0, random_state=self.seed)
+        model_full = LogisticRegression(max_iter=1000, C=2.0, random_state=self.seed, n_jobs=1)
         model_full.fit(X_tr_full, y_train)
         pred_full = model_full.predict(X_te_full)
         full_metrics = compute_categorization_metrics(y_test, pred_full)
@@ -71,7 +71,7 @@ class AblationEngine:
 
         # Subtractive 1: No Behavioral Features (Text only)
         X_tr_text, X_te_text, _ = build_text_features(train_df[desc_col], test_df[desc_col])
-        model_text = LogisticRegression(max_iter=500, C=2.0, random_state=self.seed)
+        model_text = LogisticRegression(max_iter=1000, C=2.0, random_state=self.seed, n_jobs=1)
         model_text.fit(X_tr_text, y_train)
         pred_text = model_text.predict(X_te_text)
         m_text = compute_categorization_metrics(y_test, pred_text)
@@ -89,7 +89,7 @@ class AblationEngine:
         raw_tr_df["merchant_raw"] = raw_tr_df[desc_col]
         raw_te_df["merchant_raw"] = raw_te_df[desc_col]
         X_tr_raw, X_te_raw, _ = build_text_features(raw_tr_df["merchant_raw"], raw_te_df["merchant_raw"])
-        model_raw = LogisticRegression(max_iter=500, C=2.0, random_state=self.seed)
+        model_raw = LogisticRegression(max_iter=1000, C=2.0, random_state=self.seed, n_jobs=1)
         model_raw.fit(X_tr_raw, y_train)
         pred_raw = model_raw.predict(X_te_raw)
         m_raw = compute_categorization_metrics(y_test, pred_raw)
@@ -105,7 +105,7 @@ class AblationEngine:
         no_temp_tr = train_df.drop(columns=["hour", "weekday", "month", "quarter"], errors="ignore")
         no_temp_te = test_df.drop(columns=["hour", "weekday", "month", "quarter"], errors="ignore")
         X_tr_nt, X_te_nt, _ = build_combined_features(no_temp_tr, no_temp_te)
-        model_nt = LogisticRegression(max_iter=500, C=2.0, random_state=self.seed)
+        model_nt = LogisticRegression(max_iter=1000, C=2.0, random_state=self.seed, n_jobs=1)
         model_nt.fit(X_tr_nt, y_train)
         pred_nt = model_nt.predict(X_te_nt)
         m_nt = compute_categorization_metrics(y_test, pred_nt)
