@@ -56,22 +56,25 @@ class SpendSmartServingAPI:
                 cat, conf = self.categorizer.predict_with_confidence([description])
                 category = cat[0]
                 confidence = float(conf[0])
+                source = "model"
             else:
                 category = "food_dining"
-                confidence = 0.85
+                confidence = 0.0
+                source = "fallback_no_model"
 
         return {
             "description": description,
             "amount": amount,
             "predicted_category": category,
             "confidence": round(confidence, 4),
+            "source": source,
             "latency_ms": round(t.elapsed * 1000.0, 3),
         }
 
     def forecast_user(self, user_id: str) -> Dict[str, Any]:
         """Endpoint 2: Forecast next-month spending per category for a user."""
         with Timer() as t:
-            # Deterministic serving forecasts based on category baselines
+            # Demo mode: synthetic random forecasts (no trained model loaded)
             forecasts = {
                 cat: round(float(np.random.uniform(500, 5000)), 2)
                 for cat in EXPENSE_CATEGORIES
@@ -82,6 +85,7 @@ class SpendSmartServingAPI:
             "forecast_horizon": "30_days",
             "category_forecasts": forecasts,
             "total_projected_spend": round(sum(forecasts.values()), 2),
+            "source": "demo_synthetic",
             "latency_ms": round(t.elapsed * 1000.0, 3),
         }
 
@@ -96,7 +100,7 @@ class SpendSmartServingAPI:
                 "volatility": 0.14,
             }
 
-        return {**state, "latency_ms": round(t.elapsed * 1000.0, 3)}
+        return {**state, "source": "static_demo", "latency_ms": round(t.elapsed * 1000.0, 3)}
 
     def recommend_budget(self, user_id: str) -> Dict[str, Any]:
         """Endpoint 4: Generate constraint-aware budget recommendations."""
@@ -122,6 +126,7 @@ class SpendSmartServingAPI:
             "user_id": str(user_id),
             "recommendations": recs,
             "total_potential_savings": 1700.0,
+            "source": "static_demo",
             "latency_ms": round(t.elapsed * 1000.0, 3),
         }
 
@@ -144,6 +149,7 @@ class SpendSmartServingAPI:
         return {
             "user_id": str(user_id),
             **health_res,
+            "source": "static_demo",
             "latency_ms": round(t.elapsed * 1000.0, 3),
         }
 

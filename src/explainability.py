@@ -86,8 +86,8 @@ class PATFormerAttentionExtractor:
     """Extracts attention matrix from PATFormer Transformer Encoder layers."""
 
     @staticmethod
-    def extract_attention(model: torch.nn.Module, seq_len: int = 64) -> np.ndarray:
-        """Construct synthetic or extracted causal attention heatmap matrix (seq_len, seq_len)."""
+    def generate_synthetic_causal_prior(seq_len: int = 64) -> np.ndarray:
+        """Generate synthetic causal prior attention matrix (not extracted from a trained model)."""
         # Causal triangular matrix with exponential recency decay
         attn = np.zeros((seq_len, seq_len))
         for i in range(seq_len):
@@ -95,6 +95,35 @@ class PATFormerAttentionExtractor:
                 attn[i, j] = np.exp(-0.1 * (i - j))
             attn[i, : i + 1] /= attn[i, : i + 1].sum()
         return attn
+
+    @staticmethod
+    def extract_real_attention(model: torch.nn.Module, x: torch.Tensor) -> np.ndarray:
+        """Extract real attention weights using PyTorch hooks."""
+        if model is None:
+            raise ValueError("Model must be provided to extract real attention.")
+        
+        attentions = []
+        def hook(module, input, output):
+            # output of MultiheadAttention is (attn_output, attn_output_weights)
+            if isinstance(output, tuple) and len(output) == 2:
+                attentions.append(output[1].detach().cpu().numpy())
+                
+        hooks = []
+        for module in model.modules():
+            if isinstance(module, torch.nn.MultiheadAttention):
+                hooks.append(module.register_forward_hook(hook))
+                
+        try:
+            with torch.no_grad():
+                model(x)
+        finally:
+            for h in hooks:
+                h.remove()
+                
+        if not attentions:
+            return np.zeros((x.size(0), x.size(0)))
+            
+        return np.mean(attentions, axis=0)
 
 
 def generate_explanation_artifacts(mode: str = "smoke") -> Dict[str, Any]:
@@ -111,8 +140,9 @@ def generate_explanation_artifacts(mode: str = "smoke") -> Dict[str, Any]:
     with open(out_dir / "counterfactual_explanation.json", "w") as f:
         json.dump(cf, f, indent=2)
 
-    # Attention matrix save
-    attn = PATFormerAttentionExtractor.extract_attention(None, seq_len=16)
-    np.savetxt(out_dir / "patformer_attention_matrix.csv", attn, delimiter=",", fmt="%.4f")
+    # Real attention extraction requires a trained PATFormer model 
+    # which is only available during neural engine stage.
+    attn = PATFormerAttentionExtractor.generate_synthetic_causal_prior(seq_len=16)
+    np.savetxt(out_dir / "synthetic_causal_prior.csv", attn, delimiter=",", fmt="%.4f")
 
     return cf

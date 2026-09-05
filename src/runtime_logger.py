@@ -81,7 +81,13 @@ class RuntimeLogger:
             pass
 
     def capture_resources(self) -> SystemResourceMetrics:
-        """Capture current system CPU, RAM, and GPU memory utilization."""
+        """Capture current system CPU, RAM, and GPU memory utilization.
+
+        Notes:
+            - GPU metrics come from torch.cuda if available.
+            - CPU utilization requires psutil (optional); reported as N/A (0.0) without it.
+            - RAM tracked via tracemalloc if active; reported as 0.0 without it.
+        """
         metrics = SystemResourceMetrics()
 
         # GPU metrics if CUDA is active
@@ -90,19 +96,31 @@ class RuntimeLogger:
                 import torch
                 metrics.vram_mb = round(torch.cuda.memory_allocated() / (1024 * 1024), 2)
                 metrics.peak_vram_mb = round(torch.cuda.max_memory_allocated() / (1024 * 1024), 2)
-                metrics.gpu_utilization_pct = 85.0 if metrics.vram_mb > 0 else 0.0
+                # Only report GPU util if we can actually measure it
+                try:
+                    # torch.cuda.utilization() available in PyTorch >= 2.1
+                    metrics.gpu_utilization_pct = float(torch.cuda.utilization())
+                except (AttributeError, RuntimeError):
+                    metrics.gpu_utilization_pct = 0.0  # Not measurable
             except Exception:
                 pass
 
-        # CPU/RAM metrics
+        # CPU/RAM metrics — use tracemalloc if active, psutil if available
         try:
             import tracemalloc
-            mem = tracemalloc.get_traced_memory()[1] / (1024 * 1024)
-            metrics.ram_mb = round(mem, 2)
+            if tracemalloc.is_tracing():
+                mem = tracemalloc.get_traced_memory()[1] / (1024 * 1024)
+                metrics.ram_mb = round(mem, 2)
         except Exception:
-            metrics.ram_mb = 120.0
+            pass  # Report 0.0 rather than fabricating
 
-        metrics.cpu_utilization_pct = 45.0
+        # CPU utilization — only if psutil is installed
+        try:
+            import psutil
+            metrics.cpu_utilization_pct = psutil.cpu_percent(interval=0.1)
+        except ImportError:
+            metrics.cpu_utilization_pct = 0.0  # Not measurable without psutil
+
         return metrics
 
     def log_experiment(
@@ -149,92 +167,103 @@ class RuntimeLogger:
         return record
 
     def generate_optimization_reports(self) -> pd.DataFrame:
-        """Generate before vs after optimization comparison files and markdown report."""
+        """Generate Table 11 and optimization report from REAL runtime_logs.csv data.
+
+        Does NOT use hardcoded before/after arrays. Instead:
+        - Reads actual runtime_logs.csv from the current run
+        - Aggregates per-model runtime statistics
+        - Generates Table 11 from real measured values
+        """
         log("  Generating Runtime Optimization Comparison Report...")
 
         reports_dir = Path("reports")
         reports_dir.mkdir(parents=True, exist_ok=True)
+        tables_dir = reports_dir / "tables"
+        tables_dir.mkdir(parents=True, exist_ok=True)
         results_dir = Path(f"reports/results/{self.mode}")
         results_dir.mkdir(parents=True, exist_ok=True)
 
-        # Baseline (Unoptimized V4) vs Optimized (V4.1)
-        before_data = [
-            {"component": "Data Preprocessing", "runtime_seconds": 45.2, "peak_ram_mb": 450.0, "gpu_util_pct": 10.0},
-            {"component": "Feature Extraction", "runtime_seconds": 62.8, "peak_ram_mb": 620.0, "gpu_util_pct": 15.0},
-            {"component": "Categorization Benchmarks", "runtime_seconds": 28.5, "peak_ram_mb": 310.0, "gpu_util_pct": 40.0},
-            {"component": "Forecasting Benchmarks", "runtime_seconds": 18.2, "peak_ram_mb": 280.0, "gpu_util_pct": 35.0},
-            {"component": "PATFormer Training", "runtime_seconds": 120.4, "peak_ram_mb": 850.0, "gpu_util_pct": 65.0},
-            {"component": "Total Pipeline", "runtime_seconds": 275.1, "peak_ram_mb": 850.0, "gpu_util_pct": 33.0},
-        ]
+        # Read actual runtime logs from this run
+        if not self.csv_path.exists():
+            log("  [RuntimeLogger] No runtime_logs.csv found — Table 11 skipped.")
+            # Create minimal placeholder Table 11 so downstream gates don't fail
+            table_11 = pd.DataFrame(columns=[
+                "Model", "Task", "Mean Runtime (s)", "Min Runtime (s)",
+                "Max Runtime (s)", "Mean RAM (MB)", "Experiments"
+            ])
+            table_11.to_csv(results_dir / "Table_11_Optimization_Comparison.csv", index=False)
+            return table_11
 
-        df_before = pd.DataFrame(before_data)
-        df_before.to_csv(reports_dir / "runtime_before_optimization.csv", index=False)
+        rt_df = pd.read_csv(self.csv_path)
+        if rt_df.empty:
+            log("  [RuntimeLogger] runtime_logs.csv is empty — Table 11 skipped.")
+            table_11 = pd.DataFrame(columns=[
+                "Model", "Task", "Mean Runtime (s)", "Experiments"
+            ])
+            table_11.to_csv(results_dir / "Table_11_Optimization_Comparison.csv", index=False)
+            return table_11
 
-        after_data = [
-            {"component": "Data Preprocessing", "runtime_seconds": 12.1, "peak_ram_mb": 180.0, "gpu_util_pct": 10.0},
-            {"component": "Feature Extraction (Cached)", "runtime_seconds": 4.2, "peak_ram_mb": 150.0, "gpu_util_pct": 15.0},
-            {"component": "Categorization Benchmarks", "runtime_seconds": 14.1, "peak_ram_mb": 210.0, "gpu_util_pct": 75.0},
-            {"component": "Forecasting Benchmarks", "runtime_seconds": 8.5, "peak_ram_mb": 190.0, "gpu_util_pct": 70.0},
-            {"component": "PATFormer Training (AMP)", "runtime_seconds": 45.2, "peak_ram_mb": 420.0, "gpu_util_pct": 92.0},
-            {"component": "Total Pipeline", "runtime_seconds": 84.1, "peak_ram_mb": 420.0, "gpu_util_pct": 52.4},
-        ]
-
-        df_after = pd.DataFrame(after_data)
-        df_after.to_csv(reports_dir / "runtime_after_optimization.csv", index=False)
-
-        # Table 11: Runtime Optimization Comparison
+        # Aggregate real per-model runtime statistics
         t11_rows = []
-        for b, a in zip(before_data, after_data):
-            r_reduction = round(((b["runtime_seconds"] - a["runtime_seconds"]) / b["runtime_seconds"]) * 100.0, 1)
-            m_reduction = round(((b["peak_ram_mb"] - a["peak_ram_mb"]) / b["peak_ram_mb"]) * 100.0, 1)
-            gpu_imp = round(a["gpu_util_pct"] - b["gpu_util_pct"], 1)
-
+        for model_name, grp in rt_df.groupby("model_name"):
             t11_rows.append({
-                "Component": b["component"],
-                "V4 Runtime (s)": b["runtime_seconds"],
-                "V4.1 Runtime (s)": a["runtime_seconds"],
-                "Runtime Reduction (%)": f"{r_reduction}%",
-                "RAM Savings (%)": f"{m_reduction}%",
-                "GPU Util Gain (%)": f"+{gpu_imp}%",
+                "Model": model_name,
+                "Experiments": len(grp),
+                "Mean Runtime (s)": round(grp["elapsed_seconds"].mean(), 4),
+                "Min Runtime (s)": round(grp["elapsed_seconds"].min(), 4),
+                "Max Runtime (s)": round(grp["elapsed_seconds"].max(), 4),
+                "Mean RAM (MB)": round(grp["ram_mb"].mean(), 2),
+                "Mean GPU Util (%)": round(grp["gpu_utilization_pct"].mean(), 1),
             })
 
         table_11 = pd.DataFrame(t11_rows)
         table_11.to_csv(results_dir / "Table_11_Optimization_Comparison.csv", index=False)
-        table_11.to_csv(Path("reports/tables/Table_11_Optimization_Comparison.csv"), index=False)
+        table_11.to_csv(tables_dir / "Table_11_Optimization_Comparison.csv", index=False)
 
-        # Optimization Report Markdown
-        opt_report = f"""# SpendSmart V4.1 — Research Infrastructure Optimization Report
+        # Compute real summary stats for the report
+        total_runtime = rt_df["elapsed_seconds"].sum()
+        total_experiments = len(rt_df)
+        mean_ram = rt_df["ram_mb"].mean()
+        mean_gpu = rt_df["gpu_utilization_pct"].mean()
 
-## Executive Summary
-SpendSmart V4.1 introduces disk/memory feature caching, autosave versioning, experiment resumption, and PyTorch AMP GPU acceleration.
+        # Optimization Report Markdown — from REAL data
+        table_md_rows = []
+        for _, row in table_11.iterrows():
+            table_md_rows.append(
+                f"| {row['Model']} | {row['Experiments']} | "
+                f"{row['Mean Runtime (s)']:.4f}s | {row['Mean RAM (MB)']:.1f} MB | "
+                f"{row['Mean GPU Util (%)']:.1f}% |"
+            )
+        table_md = "\n".join(table_md_rows)
 
-### Overall Optimization Gains
-- **Total Pipeline Runtime Reduction**: **69.4%** (from 275.1s -> 84.1s)
-- **Peak RAM Reduction**: **50.6%** (from 850 MB -> 420 MB)
-- **GPU Utilization Gain**: **+19.4%** average (peak 92% on PATFormer training)
-- **Preprocessing & Feature Extraction Savings**: **78.2%** via `artifacts/cache/`
+        opt_report = f"""# SpendSmart V4.1 — Runtime Report (Mode: {self.mode})
+
+## Execution Summary (Real Measured Values)
+- **Total Experiments**: {total_experiments}
+- **Total Runtime**: {total_runtime:.1f}s ({total_runtime / 60.0:.1f} min)
+- **Mean RAM Usage**: {mean_ram:.1f} MB
+- **Mean GPU Utilization**: {mean_gpu:.1f}%
 
 ---
 
-## Component Runtime Comparison (Table 11)
+## Per-Model Runtime Breakdown (Table 11)
 
-| Component | V4 Runtime | V4.1 Optimized | Runtime Reduction | RAM Savings |
-|-----------|------------|----------------|-------------------|-------------|
-| Data Preprocessing | 45.2s | 12.1s | 73.2% | 60.0% |
-| Feature Extraction | 62.8s | 4.2s (Cached) | 93.3% | 75.8% |
-| Categorization | 28.5s | 14.1s | 50.5% | 32.3% |
-| Forecasting | 18.2s | 8.5s | 53.3% | 32.1% |
-| PATFormer (AMP) | 120.4s | 45.2s | 62.5% | 50.6% |
-| **Total** | **275.1s** | **84.1s** | **69.4%** | **50.6%** |
+| Model | Experiments | Mean Runtime | Mean RAM | Mean GPU Util |
+|-------|------------|-------------|----------|---------------|
+{table_md}
 
 ---
 
-## Fault Tolerance & Resumption SLA
-1. **Checkpoint Recovery**: Interrupted Colab jobs resume from latest `MODEL_SPLIT_SEED_STAGE.pt` checkpoint within < 2 seconds.
-2. **Feature Reusability**: Preprocessed sparse TF-IDF matrices are computed once and reused across all 5 seeds.
-3. **Drive & Git Sync**: Every completed experiment is autosaved to disk, mirrored to Google Drive (if mounted), and committed to git.
+## Infrastructure Features
+1. **Feature Caching**: TF-IDF sparse matrices cached in `artifacts/cache/` for cross-seed reuse.
+2. **Experiment Resumption**: Interrupted Colab jobs resume from latest checkpoint.
+3. **Autosave**: Every completed experiment is autosaved to disk.
+4. **Git Sync**: Experiment commits after each completed benchmark.
+
+*Report generated from `{self.csv_path}` at {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}*
 """
         (reports_dir / "optimization_report.md").write_text(opt_report)
 
-        log("  Optimization comparison report & Table 11 created.")
+        log("  Optimization comparison report & Table 11 created from real runtime data.")
         return table_11
+

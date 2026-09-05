@@ -1,11 +1,13 @@
-# SpendSmart V4 — Paper Readiness Audit
+# SpendSmart V4 â€” Paper Readiness Audit
 
 | Check | Requirement | Status | Evidence |
 |-------|-------------|--------|----------|
-| 1 | No Mocked Metrics | PASS | All metrics from model fit/eval |
-| 2 | Leakage Audit | PASS | `src/leakage_audit.py` passed |
-| 3 | Locked Test Guard | PASS | Manifest verification enforced |
-| 4 | Multi-Seed Stats | PASS | 5-seed bootstrap CIs computed |
-| 5 | Publication Tables | PASS | Tables 1–10 auto-generated |
-| 6 | Publication Figures | PASS | Figures 1–16 saved at 300 DPI |
-| 7 | Artifact Verification | PASS | All CSV/JSON verified on disk |
+| 1 | No Mocked Metrics | SKIP | significance_tests.csv empty (single-seed run) |
+| 2 | Leakage Audit | PASS | `src/leakage_audit.py` integrated in pipeline |
+| 3 | Locked Test Guard | PASS | LockedTestGuard module exists |
+| 4 | Multi-Seed Stats | SKIP | Only 1 seed(s) â€” need >=2 for CIs |
+| 5 | Publication Tables | PASS | 3/3 tables generated |
+| 6 | Publication Figures | PASS | 20 figures generated |
+| 7 | Artifact Verification | PASS | experiment_registry.csv verified |
+
+*Audit generated at runtime for mode=`smoke`*

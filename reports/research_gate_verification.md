@@ -1,4 +1,4 @@
-# SpendSmart V4 — Research Gate Verification
+# SpendSmart V4 â€” Research Gate Verification
 
 **ALL RESEARCH GATES VERIFIED AND PASSED.**
 

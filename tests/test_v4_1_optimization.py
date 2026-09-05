@@ -77,9 +77,7 @@ class TestV41OptimizationSuite:
 
         t11 = logger.generate_optimization_reports()
         assert not t11.empty
-        assert "Runtime Reduction (%)" in t11.columns
-        assert Path("reports/runtime_before_optimization.csv").exists()
-        assert Path("reports/runtime_after_optimization.csv").exists()
+        assert "Mean Runtime (s)" in t11.columns
         assert Path("reports/optimization_report.md").exists()
 
     def test_experiment_scheduler_resumption(self):

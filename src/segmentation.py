@@ -14,7 +14,7 @@ from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
 from config import ARTIFACTS_DIR, EXPENSE_CATEGORIES, N_COHORTS, RANDOM_SEED
-from features import PROFILE_FEATURE_COLS
+from src.features import PROFILE_FEATURE_COLS
 
 
 class UserSegmenter:

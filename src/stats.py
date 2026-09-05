@@ -40,9 +40,9 @@ def compute_bootstrap_ci(
         return round(mean_val, 4), round(mean_val, 4), round(mean_val, 4)
 
     boot_means = []
-    np.random.seed(42)
+    rng = np.random.RandomState(42)
     for _ in range(num_bootstraps):
-        sample = np.random.choice(data, size=len(data), replace=True)
+        sample = rng.choice(data, size=len(data), replace=True)
         boot_means.append(np.mean(sample))
 
     alpha = (1.0 - ci_level) / 2.0
@@ -137,16 +137,10 @@ class StatisticalValidator:
                     **sig_res,
                 })
 
-        sig_df = pd.DataFrame(sig_records) if sig_records else pd.DataFrame([{
-            "comparison": "TF-IDF LR vs Baseline",
-            "task": "categorization",
-            "metric": "Macro F1",
-            "t_statistic": 12.45,
-            "p_value_ttest": 0.0001,
-            "wilcoxon_stat": 0.0,
-            "p_value_wilcoxon": 0.0001,
-            "significant_p05": True,
-        }])
+        sig_df = pd.DataFrame(sig_records) if sig_records else pd.DataFrame(columns=[
+            "comparison", "task", "metric", "t_statistic", "p_value_ttest",
+            "wilcoxon_stat", "p_value_wilcoxon", "significant_p05",
+        ])
 
         out_dir = Path(f"reports/results/{self.mode}")
         out_dir.mkdir(parents=True, exist_ok=True)
